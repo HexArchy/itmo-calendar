@@ -1,0 +1,6 @@
+.certs
+.env.prod
+/bin
+/bin/*
+/certs
+/certs/*

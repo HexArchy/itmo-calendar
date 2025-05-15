@@ -1,0 +1,4 @@
+variable1: "this_should_be_overridden_by_default"
+variable2: "file"
+variable3: "file_should_be_overridden_by_env"
+variable4: "file_should_be_overridden_by_flag_or_env"

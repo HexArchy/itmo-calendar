@@ -1,0 +1,85 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: itmo_calendar_app
+    restart: always
+    depends_on:
+      - postgres
+      - rabbitmq
+    ports:
+      - "443:8443"
+    volumes:
+      - ./certs:/etc/itmo-calendar/certs:ro
+      - ./certs/postgres:/etc/itmo-calendar/certs/postgres:ro
+      - app_logs:/var/log/itmo-calendar
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "--insecure",
+          "-f",
+          "https://localhost:8443/api/v1/health",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  postgres:
+    image: postgres:16.3
+    container_name: itmo_calendar_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: itmo_calendar
+      POSTGRES_USER: itmo_calendar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./certs/postgres:/var/lib/postgresql/certs:ro
+      - ./migrations:/docker-entrypoint-initdb.d
+    command:
+      - "-c"
+      - "ssl=on"
+      - "-c"
+      - "ssl_cert_file=/var/lib/postgresql/certs/server.crt"
+      - "-c"
+      - "ssl_key_file=/var/lib/postgresql/certs/server.key"
+      - "-c"
+      - "ssl_ca_file=/var/lib/postgresql/certs/ca.crt"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U itmo_calendar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: itmo_calendar_rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: itmo_calendar
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+      - ./certs/rabbitmq:/etc/rabbitmq/certs:ro
+      - ./configs/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    ports:
+      - "15672:15672" # Management UI
+      - "5671:5671" # AMQPS port (TLS)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  rabbitmq_data:
+  app_logs:

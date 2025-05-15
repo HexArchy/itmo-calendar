@@ -1,0 +1,32 @@
+services:
+  postgres:
+    image: postgres:16.3
+    container_name: itmo_calendar_local_pg
+    environment:
+      POSTGRES_DB: itmo_calendar
+      POSTGRES_USER: itmo_calendar
+      POSTGRES_PASSWORD: itmo_calendar_pass
+    command:
+      - "-c"
+      - "log_statement=all"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+
+  rabbitmq:
+    image: rabbitmq:3.9-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672" # AMQP protocol
+      - "15672:15672" # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+volumes:
+  pgdata:
+  rabbitmq-data:

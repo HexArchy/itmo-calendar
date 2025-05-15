@@ -1,0 +1,2 @@
+file_variable: "foo_${BAR}"
+file_variable_slice: [ "foo_${BAR}" ]

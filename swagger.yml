@@ -1,0 +1,126 @@
+swagger: '2.0'
+info:
+  version: '1.0.0'
+  title: Itmo Calendar
+  description: Itmo calendar sync service
+basePath: /api/v1
+consumes:
+  - application/json
+produces:
+  - application/json
+
+securityDefinitions:
+  JWT:
+    type: apiKey
+    in: header
+    name: X-Auth-Token
+    description: "JWT token for user authentication"
+
+security: []
+
+paths:
+  /health:
+    get:
+      summary: Health check endpoint.
+      operationId: healthCheck
+      security: []
+      description: Verifies the API is operational and returns its status.
+      tags:
+        - System
+      responses:
+        200:
+          description: Service is healthy.
+        503:
+          description: Service is unhealthy.
+          schema:
+            $ref: "#/definitions/Error"
+
+  /{isu}/ical:
+    get:
+      summary: Get user's iCal file by ISU.
+      operationId: getICal
+      description: Returns the iCalendar (.ics) file for the user with the given ISU.
+      tags:
+        - CalDav
+      parameters:
+        - name: isu
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: ISU of the user.
+      produces:
+        - text/calendar
+      responses:
+        200:
+          description: iCal file.
+          schema:
+            type: string
+            format: binary
+        404:
+          description: Not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
+  /subscribe:
+    post:
+      summary: Subscribe and generate iCal for user.
+      operationId: subscribeSchedule
+      description: Subscribes user by ISU and password, generates and stores iCal file.
+      tags:
+        - CalDav
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: "#/definitions/SubscribeRequest"
+      responses:
+        200:
+          description: Subscription successful.
+          schema:
+            $ref: "#/definitions/SubscribeResponse"
+        400:
+          description: Bad request.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
+definitions:
+  Error:
+    type: object
+    properties:
+      error:
+        type: string
+        example: "Service Unavailable"
+      message:
+        type: string
+        example: "The service is currently unavailable. Please try again later."
+
+  SubscribeRequest:
+    type: object
+    required:
+      - isu
+      - password
+    properties:
+      isu:
+        type: integer
+        format: int64
+        example: 123456789
+      password:
+        type: string
+        example: "user_password"
+
+  SubscribeResponse:
+    type: object
+    properties:
+      message:
+        type: string
+        example: "Subscription successful. iCal generated."

@@ -1,0 +1,74 @@
+app:
+  name: "ITMO Calendar"
+  env: "development"
+  cluster: "local"
+  version: "0.0.1"
+  instance: "node-001"
+  owner: "nbelyakov"
+
+
+postgres:
+  connection:
+    hosts: "localhost:5432"
+    username: "itmo_calendar"
+    password: "itmo_calendar_pass"
+    database: "itmo_calendar"
+    additional: "sslmode=disable"
+  pool:
+    max_connections: 10
+    min_connections: 1
+    max_connection_lifetime: "1h"
+    max_connection_idle_time: "30m"
+    health_check_period: "10s"
+rabbitmq:
+  host: "localhost"
+  port: 5672
+  user: "guest"
+  password: "guest"
+  vhost: "/"
+  queues:
+    cron_process_schedule: "cron_process_schedule"
+    send_schedule: "send_schedule"
+
+itmo:
+  base_url: "https://my.itmo.ru/api"
+  provider_url: "https://id.itmo.ru/auth/realms/itmo"
+  redirect_url: "https://my.itmo.ru/login/callback"
+  client_id: "student-personal-cabinet"
+
+secret:
+  jwt_secret: "3d76af454b6bb0495ba8b79ce4f3a0b2"
+
+logger:
+  # Log level: debug, info, warn, error, dpanic, panic, fatal
+  level: "debug"
+  # Encoding: json or console
+  encoding: "json"
+  # Output paths (console uses stdout, file uses paths)
+  output_paths:
+  - "stdout"
+  # - "/var/log/veritychain/app.log"
+  # Error output paths
+  error_output_paths:
+  - "stderr"
+  # - "/var/log/veritychain/error.log"
+  # Development mode enables stacktraces for all levels
+  development: false
+  # Sampling reduces log volume for repeated entries
+  sampling: true
+  # Stacktrace level: debug, info, warn, error, dpanic, panic, fatal
+  stacktrace: "warn"
+
+# Graceful shutdown settings
+shutdown:
+  # Delay before starting shutdown sequence
+  delay: 5s
+  # Maximum time to wait for the entire shutdown process
+  timeout: 30s
+  # Maximum time allowed for each callback to complete
+  callback_timeout: 10s
+
+cron:
+  batch_size: 50
+  min_update_interval: 6h
+  schedule_preparation_interval: 30m

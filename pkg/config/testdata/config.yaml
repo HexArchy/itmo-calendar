@@ -1,0 +1,19 @@
+bool: true
+int: 123
+int32: 123
+int64: 123
+int_slice: [ 100, 200, 300 ]
+int32_slice: [ 100, 200, 300 ]
+int64_slice: [ 100, 200, 300 ]
+uint: 13
+uint16: 13
+uint_slice: [ 0, 13, 666 ]
+float32: 3.14
+float64: 100.500
+float32_slice: [ 3.14, 100.500 ]
+float64_slice: [ 3.14, 100.500 ]
+string: "trololo"
+string_slice: [ "foo", "bar" ]
+duration: "1s"
+duration_slice: [ "1s", "1ms", "1ns" ]
+file_sourced: [ 1, 2, 3 ]

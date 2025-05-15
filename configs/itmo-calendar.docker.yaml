@@ -1,0 +1,81 @@
+app:
+  name: "ITMO Calendar"
+  env: "production"
+  cluster: "docker"
+  version: "1.0.0"
+  instance: "node-001"
+  owner: "n.belyakov"
+
+http_server:
+  host: "0.0.0.0"
+  port: 8443
+  tls:
+    enabled: true
+    cert_file: "/etc/itmo-calendar/certs/server.crt"
+    key_file: "/etc/itmo-calendar/certs/server.key"
+    ca_file: "/etc/itmo-calendar/certs/ca.crt"
+  read_timeout: "10s"
+  write_timeout: "10s"
+  idle_timeout: "120s"
+  enable_http2: true
+
+postgres:
+  connection:
+    hosts: "postgres:5432"
+    username: "itmo_calendar"
+    password: "${POSTGRES_PASSWORD}"
+    database: "itmo_calendar"
+    additional: "sslmode=require" 
+    tls:
+      enabled: false
+  pool:
+    max_connections: 25
+    min_connections: 5
+    max_connection_lifetime: "1h"
+    max_connection_idle_time: "10m"
+    health_check_period: "30s"
+  connect_timeout: "10s"
+  statement_timeout: "30s"
+
+rabbitmq:
+  host: "rabbitmq"
+  port: 5671
+  user: "itmo_calendar"
+  password: "${RABBITMQ_PASSWORD}"
+  vhost: "/"
+  queues:
+    cron_process_schedule: "cron_process_schedule"
+    send_schedule: "send_schedule"
+  tls:
+    enabled: true
+    cert_file: "/etc/itmo-calendar/certs/rabbitmq/server.crt"
+    key_file: "/etc/itmo-calendar/certs/rabbitmq/server.key"
+    ca_file: "/etc/itmo-calendar/certs/rabbitmq/ca.crt"
+
+itmo:
+  base_url: "https://my.itmo.ru/api"
+  provider_url: "https://id.itmo.ru/auth/realms/itmo"
+  redirect_url: "https://my.itmo.ru/login/callback"
+  client_id: "student-personal-cabinet"
+
+logger:
+  level: "debug"
+  encoding: "json"
+  output_paths:
+    - "stdout"
+    - "/var/log/itmo-calendar/app.log"
+  error_output_paths:
+    - "stderr"
+    - "/var/log/itmo-calendar/error.log"
+  development: false
+  sampling: true
+  stacktrace: "error"
+
+
+shutdown:
+  delay: "5s"
+  timeout: "30s"
+  callback_timeout: "10s"
+
+secret:
+  jwt_secret: "${JWT_SECRET}"

@@ -1,0 +1,5 @@
+bool: "should_be_bool_not_string"
+int: "should_be_int_not_string"
+float: "should_be_float_not_string"
+duration: "invalid_duration"
+int_slice: "should_be_array_not_string"
