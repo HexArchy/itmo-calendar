@@ -1,0 +1,9 @@
+.DS_Store
+.certs
+.claude/
+.env
+.env.*
+CLAUDE.md
+/bin
+/certs
+configs/*.local.yaml
