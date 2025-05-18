@@ -22,3 +22,12 @@ EOF
 
 # Start the services
 docker-compose --env-file .env.prod -f docker-compose.prod.yml up -d
+```
+
+## Docker Image
+
+Docker image is available on GitHub Container Registry:
+
+```bash
+docker pull ghcr.io/hexarchy/itmo-calendar:latest
+```
