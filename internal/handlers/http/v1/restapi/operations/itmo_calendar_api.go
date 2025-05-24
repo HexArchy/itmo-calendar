@@ -21,8 +21,8 @@ import (
 	"github.com/go-openapi/swag"
 
 	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/cal_dav"
+	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/schedule"
 	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/system"
-
 	"go.uber.org/zap"
 )
 
@@ -53,6 +53,9 @@ func NewItmoCalendarAPI(spec *loads.Document) *ItmoCalendarAPI {
 
 		CalDavGetICalHandler: cal_dav.GetICalHandlerFunc(func(params cal_dav.GetICalParams) middleware.Responder {
 			return middleware.NotImplemented("operation cal_dav.GetICal has not yet been implemented")
+		}),
+		ScheduleGetScheduleHandler: schedule.GetScheduleHandlerFunc(func(params schedule.GetScheduleParams) middleware.Responder {
+			return middleware.NotImplemented("operation schedule.GetSchedule has not yet been implemented")
 		}),
 		SystemHealthCheckHandler: system.HealthCheckHandlerFunc(func(params system.HealthCheckParams) middleware.Responder {
 			return middleware.NotImplemented("operation system.HealthCheck has not yet been implemented")
@@ -101,6 +104,8 @@ type ItmoCalendarAPI struct {
 
 	// CalDavGetICalHandler sets the operation handler for the get i cal operation
 	CalDavGetICalHandler cal_dav.GetICalHandler
+	// ScheduleGetScheduleHandler sets the operation handler for the get schedule operation
+	ScheduleGetScheduleHandler schedule.GetScheduleHandler
 	// SystemHealthCheckHandler sets the operation handler for the health check operation
 	SystemHealthCheckHandler system.HealthCheckHandler
 	// CalDavSubscribeScheduleHandler sets the operation handler for the subscribe schedule operation
@@ -187,6 +192,9 @@ func (o *ItmoCalendarAPI) Validate() error {
 
 	if o.CalDavGetICalHandler == nil {
 		unregistered = append(unregistered, "cal_dav.GetICalHandler")
+	}
+	if o.ScheduleGetScheduleHandler == nil {
+		unregistered = append(unregistered, "schedule.GetScheduleHandler")
 	}
 	if o.SystemHealthCheckHandler == nil {
 		unregistered = append(unregistered, "system.HealthCheckHandler")
@@ -288,6 +296,10 @@ func (o *ItmoCalendarAPI) initHandlerCache() {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}
 	o.handlers["GET"]["/{isu}/ical"] = cal_dav.NewGetICal(o.context, o.CalDavGetICalHandler)
+	if o.handlers["GET"] == nil {
+		o.handlers["GET"] = make(map[string]http.Handler)
+	}
+	o.handlers["GET"]["/{isu}/schedule"] = schedule.NewGetSchedule(o.context, o.ScheduleGetScheduleHandler)
 	if o.handlers["GET"] == nil {
 		o.handlers["GET"] = make(map[string]http.Handler)
 	}

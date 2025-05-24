@@ -35,6 +35,36 @@ paths:
           schema:
             $ref: "#/definitions/Error"
 
+  /{isu}/schedule:
+    get:
+      summary: Get user's schedule by ISU.
+      operationId: getSchedule
+      description: Returns the schedule for the user with the given ISU.
+      tags:
+        - Schedule
+      parameters:
+        - name: isu
+          in: path
+          type: integer
+          format: int64
+          required: true
+          description: ISU of the user.
+      responses:
+        200:
+          description: User's schedule.
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/ScheduleItem"
+        404:
+          description: Not found.
+          schema:
+            $ref: "#/definitions/Error"
+        500:
+          description: Internal server error.
+          schema:
+            $ref: "#/definitions/Error"
+
   /{isu}/ical:
     get:
       summary: Get user's iCal file by ISU.
@@ -124,3 +154,64 @@ definitions:
       message:
         type: string
         example: "Subscription successful. iCal generated."
+
+  ScheduleItem:
+    type: object
+    properties:
+      date:
+        type: string
+        format: date
+        example: "2024-06-01"
+      lessons:
+        type: array
+        items:
+          type: object
+          properties:
+            subject:
+              type: string
+              example: "Mathematics"
+            type:
+              type: string
+              example: "Lecture"
+            teacher_name:
+              type: string
+              example: "Dr. Ivanov"
+            room:
+              type: string
+              example: "101"
+            note:
+              type: string
+              example: "Bring calculator"
+            building:
+              type: string
+              example: "Main"
+            format:
+              type: string
+              example: "Offline"
+            group:
+              type: string
+              example: "A1"
+            zoom_url:
+              type: string
+              example: "https://zoom.us/j/123456789"
+            time_start:
+              type: string
+              format: date-time
+              example: "2024-06-01T09:00:00Z"
+            time_end:
+              type: string
+              format: date-time
+              example: "2024-06-01T10:30:00Z"
+          required:
+            - subject
+            - type
+            - teacher_name
+            - room
+            - building
+            - format
+            - group
+            - time_start
+            - time_end
+    required:
+      - date
+      - lessons

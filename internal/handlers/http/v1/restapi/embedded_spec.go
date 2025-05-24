@@ -137,6 +137,49 @@ func init() {
           }
         }
       }
+    },
+    "/{isu}/schedule": {
+      "get": {
+        "description": "Returns the schedule for the user with the given ISU.",
+        "tags": [
+          "Schedule"
+        ],
+        "summary": "Get user's schedule by ISU.",
+        "operationId": "getSchedule",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "ISU of the user.",
+            "name": "isu",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User's schedule.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ScheduleItem"
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -150,6 +193,85 @@ func init() {
         "message": {
           "type": "string",
           "example": "The service is currently unavailable. Please try again later."
+        }
+      }
+    },
+    "ScheduleItem": {
+      "type": "object",
+      "required": [
+        "date",
+        "lessons"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "example": "2024-06-01"
+        },
+        "lessons": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "subject",
+              "type",
+              "teacher_name",
+              "room",
+              "building",
+              "format",
+              "group",
+              "time_start",
+              "time_end"
+            ],
+            "properties": {
+              "building": {
+                "type": "string",
+                "example": "Main"
+              },
+              "format": {
+                "type": "string",
+                "example": "Offline"
+              },
+              "group": {
+                "type": "string",
+                "example": "A1"
+              },
+              "note": {
+                "type": "string",
+                "example": "Bring calculator"
+              },
+              "room": {
+                "type": "string",
+                "example": "101"
+              },
+              "subject": {
+                "type": "string",
+                "example": "Mathematics"
+              },
+              "teacher_name": {
+                "type": "string",
+                "example": "Dr. Ivanov"
+              },
+              "time_end": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2024-06-01T10:30:00Z"
+              },
+              "time_start": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2024-06-01T09:00:00Z"
+              },
+              "type": {
+                "type": "string",
+                "example": "Lecture"
+              },
+              "zoom_url": {
+                "type": "string",
+                "example": "https://zoom.us/j/123456789"
+              }
+            }
+          }
         }
       }
     },
@@ -310,6 +432,49 @@ func init() {
           }
         }
       }
+    },
+    "/{isu}/schedule": {
+      "get": {
+        "description": "Returns the schedule for the user with the given ISU.",
+        "tags": [
+          "Schedule"
+        ],
+        "summary": "Get user's schedule by ISU.",
+        "operationId": "getSchedule",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "ISU of the user.",
+            "name": "isu",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User's schedule.",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ScheduleItem"
+              }
+            }
+          },
+          "404": {
+            "description": "Not found.",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          },
+          "500": {
+            "description": "Internal server error.",
+            "schema": {
+              "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -323,6 +488,88 @@ func init() {
         "message": {
           "type": "string",
           "example": "The service is currently unavailable. Please try again later."
+        }
+      }
+    },
+    "ScheduleItem": {
+      "type": "object",
+      "required": [
+        "date",
+        "lessons"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date",
+          "example": "2024-06-01"
+        },
+        "lessons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ScheduleItemLessonsItems0"
+          }
+        }
+      }
+    },
+    "ScheduleItemLessonsItems0": {
+      "type": "object",
+      "required": [
+        "subject",
+        "type",
+        "teacher_name",
+        "room",
+        "building",
+        "format",
+        "group",
+        "time_start",
+        "time_end"
+      ],
+      "properties": {
+        "building": {
+          "type": "string",
+          "example": "Main"
+        },
+        "format": {
+          "type": "string",
+          "example": "Offline"
+        },
+        "group": {
+          "type": "string",
+          "example": "A1"
+        },
+        "note": {
+          "type": "string",
+          "example": "Bring calculator"
+        },
+        "room": {
+          "type": "string",
+          "example": "101"
+        },
+        "subject": {
+          "type": "string",
+          "example": "Mathematics"
+        },
+        "teacher_name": {
+          "type": "string",
+          "example": "Dr. Ivanov"
+        },
+        "time_end": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2024-06-01T10:30:00Z"
+        },
+        "time_start": {
+          "type": "string",
+          "format": "date-time",
+          "example": "2024-06-01T09:00:00Z"
+        },
+        "type": {
+          "type": "string",
+          "example": "Lecture"
+        },
+        "zoom_url": {
+          "type": "string",
+          "example": "https://zoom.us/j/123456789"
         }
       }
     },

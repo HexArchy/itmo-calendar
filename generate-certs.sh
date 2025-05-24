@@ -65,6 +65,7 @@ DNS.1 = $CN
 DNS.2 = localhost
 IP.1 = 127.0.0.1
 IP.2 = 81.31.244.102
+IP.3 = 192.168.1.120
 EOF
 
   # Generate private key
@@ -86,6 +87,8 @@ subjectAltName = @alt_names
 DNS.1 = $CN
 DNS.2 = localhost
 IP.1 = 127.0.0.1
+IP.2 = 81.31.244.102
+IP.3 = 192.168.1.120
 EOF
 
   # Generate server certificate signed by CA

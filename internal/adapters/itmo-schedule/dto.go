@@ -92,7 +92,16 @@ func (c *Client) transformLesson(dateStr string, lesson lessonDTO) (entities.Les
 	}, nil
 }
 
-// parseDateTime combines date string (YYYY-MM-DD) and time string (HH:MM) into time.Time.
+// parseDateTime combines date string (YYYY-MM-DD) and time string (HH:MM) into time.Time in Moscow time zone.
 func parseDateTime(dateStr, timeStr string) (time.Time, error) {
-	return time.Parse("2006-01-02 15:04", dateStr+" "+timeStr)
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		return time.Time{}, errors.Wrap(err, "load Europe/Moscow location")
+	}
+	date, err := time.ParseInLocation("2006-01-02 15:04", dateStr+" "+timeStr, loc)
+	if err != nil {
+		return time.Time{}, errors.Wrapf(err, "parse date %q and time %q", dateStr, timeStr)
+	}
+
+	return date, nil
 }

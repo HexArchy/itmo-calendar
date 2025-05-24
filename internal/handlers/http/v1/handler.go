@@ -13,6 +13,7 @@ import (
 	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations"
 
 	apiCalDav "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/cal_dav"
+	apiSchedule "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/schedule"
 	apiSystem "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/restapi/operations/system"
 )
 
@@ -47,6 +48,7 @@ func (h *Handler) setUpHandlers() {
 	h.ops.SystemHealthCheckHandler = apiSystem.HealthCheckHandlerFunc(h.HealthCheckHandler)
 	h.ops.CalDavGetICalHandler = apiCalDav.GetICalHandlerFunc(h.GetICalHandler)
 	h.ops.CalDavSubscribeScheduleHandler = apiCalDav.SubscribeScheduleHandlerFunc(h.SubscribeScheduleHandler)
+	h.ops.ScheduleGetScheduleHandler = apiSchedule.GetScheduleHandlerFunc(h.GetScheduleHandler)
 
 	// You can add your middleware to concrete route
 	// h.ops.AddMiddlewareFor("%method%", "%route%", %middlewareBuilder%)
