@@ -1,50 +1,33 @@
-# Build stage
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates build-base
+RUN apk add --no-cache git ca-certificates
 
-# Set working directory
 WORKDIR /app
 
-# Copy go.mod and go.sum first for better caching
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
 COPY . .
 
-# Build the application with security flags
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s -extldflags '-static'" -o /go/bin/itmo-calendar ./cmd/itmo-calendar
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags="-w -s" \
+    -o /go/bin/itmo-calendar ./cmd/itmo-calendar
 
-# Runtime stage
 FROM alpine:3.21
 
-# Add non-root user
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup -S app && adduser -S app -G app
+RUN apk add --no-cache ca-certificates tzdata curl
 
-# Install runtime dependencies
-RUN apk add --no-cache ca-certificates tzdata
-
-# Create necessary directories with proper permissions
-RUN mkdir -p /etc/itmo-calendar/certs /var/log/itmo-calendar \
-    && chown -R appuser:appgroup /etc/itmo-calendar /var/log/itmo-calendar
-
-# Copy the binary from builder
 COPY --from=builder /go/bin/itmo-calendar /usr/local/bin/itmo-calendar
-RUN chmod +x /usr/local/bin/itmo-calendar
 
-# Copy configuration
-COPY configs/itmo-calendar.docker.yaml /etc/itmo-calendar/config.yaml
+RUN mkdir -p /etc/itmo-calendar && chown app:app /etc/itmo-calendar
 
-# Set working directory
+USER app
 WORKDIR /etc/itmo-calendar
 
-# Switch to non-root user
-USER appuser
+EXPOSE 8080
 
-# Expose the application port
-EXPOSE 8443
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/api/v1/health || exit 1
 
-# Set the entrypoint
 ENTRYPOINT ["/usr/local/bin/itmo-calendar", "--config=/etc/itmo-calendar/config.yaml"]

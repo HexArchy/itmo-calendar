@@ -2,122 +2,89 @@ package http
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"net/http"
+	"net/http/pprof"
 	"strconv"
 	"time"
 
-	"github.com/hexarchy/itmo-calendar/internal/app/container"
-	"github.com/hexarchy/itmo-calendar/internal/config"
-
-	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+
+	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/gen"
+
+	api "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1"
 )
 
-const (
-	_defaultServerShutdownTimeout = 10 * time.Second
-)
+const _defaultServerShutdownTimeout = 10 * time.Second
 
-// Server is HTTP server for ITMO Calendar API.
+// Server is the HTTP server for ITMO Calendar API.
 type Server struct {
-	server   *http.Server
-	logger   *zap.Logger
-	config   *config.HTTPServer
-	handlers []APIHandler
+	server *http.Server
+	logger *zap.Logger
+	config *Config
 }
 
-// APIHandler defines the interface for API handlers.
-type APIHandler interface {
-	AddRoutes(r *mux.Router)
-	GetVersion() string
-}
+// NewServer creates a new HTTP server with ogen handler, Scalar docs and debug routes.
+func NewServer(ogenSrv *gen.Server, cfg *Config, logger *zap.Logger) *Server {
+	mux := http.NewServeMux()
 
-// Option defines a functional option for configuring the server.
-type Option func(*Server)
+	// ogen API routes (already prefixed with /api/v1)
+	mux.Handle("/api/v1/", ogenSrv)
 
-// WithLogger sets a custom logger for the server.
-func WithLogger(logger *zap.Logger) Option {
-	return func(s *Server) {
-		s.logger = logger.With(zap.String("component", "http_server"))
-	}
-}
+	// OpenAPI spec and documentation
+	mux.Handle("/openapi.yaml", api.SpecHandler())
+	mux.Handle("/docs", api.ScalarDocsHandler())
 
-// WithAPIHandler adds an API handler to the server.
-func WithAPIHandler(handler APIHandler) Option {
-	return func(s *Server) {
-		s.handlers = append(s.handlers, handler)
-	}
-}
+	// Debug/pprof routes
+	mux.HandleFunc("/debug/pprof/", pprof.Index)
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
+	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+	mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
 
-// New creates a new HTTP server with the provided configuration and options.
-func New(c *container.Container, cfg *config.HTTPServer, opts ...Option) (*Server, error) {
-	s := &Server{
-		logger: c.Logger.With(zap.String("component", "http_server")),
-		config: &config.HTTPServer{
-			Host:         cfg.Host,
-			Port:         cfg.Port,
-			TLS:          cfg.TLS,
-			ReadTimeout:  cfg.ReadTimeout,
-			WriteTimeout: cfg.WriteTimeout,
-			IdleTimeout:  cfg.IdleTimeout,
-			EnableHTTP2:  cfg.EnableHTTP2,
-		},
-	}
+	srvLogger := logger.With(zap.String("component", "http_server"))
 
-	for _, opt := range opts {
-		opt(s)
-	}
+	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
-	if len(s.handlers) == 0 {
-		return nil, errors.New("no API handlers provided")
-	}
-
-	return s, nil
-}
-
-// Start initializes and starts the HTTP server.
-func (s *Server) Start() error {
-	router := mux.NewRouter()
-
-	for _, handler := range s.handlers {
-		version := handler.GetVersion()
-		prefix := fmt.Sprintf("/api/%s", version)
-		subrouter := router.PathPrefix(prefix).Subrouter()
-		handler.AddRoutes(subrouter)
-		s.logger.Info("Registered API handler", zap.String("version", version))
-	}
-
-	s.registerDebugRoutes(router)
-
-	addr := net.JoinHostPort(s.config.Host, strconv.Itoa(s.config.Port))
-
-	server := &http.Server{
+	httpSrv := &http.Server{
 		Addr:         addr,
-		Handler:      NewLoggingMiddleware(s.logger)(router),
-		ReadTimeout:  s.config.ReadTimeout,
-		WriteTimeout: s.config.WriteTimeout,
-		IdleTimeout:  s.config.IdleTimeout,
+		Handler:      NewLoggingMiddleware(srvLogger)(mux),
+		ReadTimeout:  cfg.ReadTimeout,
+		WriteTimeout: cfg.WriteTimeout,
+		IdleTimeout:  cfg.IdleTimeout,
 	}
 
-	s.server = server
+	return &Server{
+		server: httpSrv,
+		logger: srvLogger,
+		config: cfg,
+	}
+}
 
-	s.logger.Info("Starting HTTP server", zap.String("address", addr), zap.Bool("tls", s.config.TLS.Enabled))
+// Start starts the HTTP server (blocking).
+func (s *Server) Start() error {
+	tlsEnabled := s.config.TLS != nil && s.config.TLS.Enabled
+	s.logger.Info("Starting HTTP server", zap.String("address", s.server.Addr), zap.Bool("tls", tlsEnabled))
 
-	if s.config.TLS.Enabled {
+	if tlsEnabled {
 		tlsConfig, err := s.config.TLS.BuildTLSConfig(s.config.Host)
 		if err != nil {
 			return errors.Wrap(err, "build TLS config")
 		}
-		server.TLSConfig = tlsConfig
+		s.server.TLSConfig = tlsConfig
 
-		err = server.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
+		err = s.server.ListenAndServeTLS(s.config.TLS.CertFile, s.config.TLS.KeyFile)
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return errors.Wrap(err, "server failed to start (TLS)")
 		}
 	} else {
-		err := server.ListenAndServe()
+		err := s.server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			return errors.Wrap(err, "server failed to start")
 		}
@@ -142,6 +109,5 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 
 	s.logger.Info("HTTP server stopped")
-
 	return nil
 }

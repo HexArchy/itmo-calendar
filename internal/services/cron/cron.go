@@ -23,10 +23,7 @@ func New(client Client) *Service {
 // ScheduleSending splits ISUs into batches and sends them to the queue.
 func (s *Service) ScheduleSending(ctx context.Context, isus []int64) error {
 	for i := 0; i < len(isus); i += _batchSize {
-		end := i + _batchSize
-		if end > len(isus) {
-			end = len(isus)
-		}
+		end := min(i+_batchSize, len(isus))
 
 		batch := isus[i:end]
 		err := s.client.ScheduleSending(ctx, batch)

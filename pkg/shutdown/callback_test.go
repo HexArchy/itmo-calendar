@@ -6,9 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
+//nolint:funlen // test table is long but clear.
 func TestExecuteCallback(t *testing.T) {
 	tests := []struct {
 		name        string
@@ -25,7 +26,7 @@ func TestExecuteCallback(t *testing.T) {
 		},
 		{
 			name:        "unnamed callback",
-			callback:    &Callback{FnCtx: func(ctx context.Context) error { return nil }},
+			callback:    &Callback{FnCtx: func(_ context.Context) error { return nil }},
 			timeout:     time.Second,
 			expectError: true,
 		},
@@ -39,7 +40,7 @@ func TestExecuteCallback(t *testing.T) {
 			name: "successful context function",
 			callback: &Callback{
 				Name:  "test",
-				FnCtx: func(ctx context.Context) error { return nil },
+				FnCtx: func(_ context.Context) error { return nil },
 			},
 			timeout:     time.Second,
 			expectError: false,
@@ -57,7 +58,7 @@ func TestExecuteCallback(t *testing.T) {
 			name: "error in context function",
 			callback: &Callback{
 				Name:  "test",
-				FnCtx: func(ctx context.Context) error { return errors.New("test error") },
+				FnCtx: func(_ context.Context) error { return errors.New("test error") },
 			},
 			timeout:     time.Second,
 			expectError: true,
@@ -105,13 +106,13 @@ func TestExecuteCallback(t *testing.T) {
 			err := executeCallback(tt.callback, tt.timeout)
 
 			if tt.expectError {
-				assert.Error(t, err, "Expected error but got nil")
+				require.Error(t, err, "Expected error but got nil")
 			} else {
-				assert.NoError(t, err, "Expected no error but got: %v", err)
+				require.NoError(t, err, "Expected no error but got: %v", err)
 			}
 
 			if tt.errorType != nil {
-				assert.ErrorIs(t, err, tt.errorType, "Expected error type %v but got: %v", tt.errorType, err)
+				require.ErrorIs(t, err, tt.errorType, "Expected error type %v but got: %v", tt.errorType, err)
 			}
 		})
 	}
@@ -134,13 +135,13 @@ func TestExecuteCallbackWithCancellation(t *testing.T) {
 	}
 
 	err := executeCallback(callback, 1*time.Second)
-	assert.NoError(t, err)
-	assert.True(t, callbackExecuted)
+	require.NoError(t, err)
+	require.True(t, callbackExecuted)
 
 	callbackExecuted = false
 
 	err = executeCallback(callback, 50*time.Millisecond)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrTimeoutExceeded)
-	assert.False(t, callbackExecuted)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrTimeoutExceeded)
+	require.False(t, callbackExecuted)
 }

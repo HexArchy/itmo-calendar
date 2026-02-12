@@ -40,12 +40,11 @@ func (u *UseCase) Execute(ctx context.Context, isus []int64) error {
 	}
 
 	for _, user := range users {
-		err := u.processSending(ctx, user)
-		if err != nil {
-			u.logger.Error("failed to process sending", zap.Error(err), zap.Int64("isu", user.ISU))
+		if errProcess := u.processSending(ctx, user); errProcess != nil {
+			u.logger.Error("failed to process sending", zap.Error(errProcess), zap.Int64("isu", user.ISU))
 			continue
 		}
-		u.logger.Debug("schedule sent successfully", zap.Int64("isu", user.ISU), zap.Time("from", time.Now().AddDate(0, 0, -_defaultFromTimePeriod)), zap.Time("to", time.Now().AddDate(0, 0, _defaultToTimePeriod)))
+		u.logger.Debug("schedule sent", zap.Int64("isu", user.ISU))
 	}
 
 	return nil

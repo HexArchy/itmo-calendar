@@ -13,6 +13,7 @@ type Callback struct {
 	Name string
 
 	// Fn is the function to be executed during shutdown.
+	//
 	// Deprecated: Use FnCtx instead for better timeout handling.
 	Fn func() error
 

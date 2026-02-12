@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBase(t *testing.T) {
@@ -34,7 +35,7 @@ func TestBase(t *testing.T) {
 		CallbackTimeout: time.Second,
 	})
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 2, i)
 }
 
@@ -65,7 +66,7 @@ func TestBaseWithContext(t *testing.T) {
 		t.Error("Context was not canceled in time")
 	}
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, canceled)
 }
 
@@ -145,7 +146,7 @@ func TestCallbackTimeout(t *testing.T) {
 		CallbackTimeout: 100 * time.Millisecond,
 	})
 
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Equal(t, ErrTimeoutExceeded, err)
 }
 
@@ -166,7 +167,7 @@ func TestAdd(t *testing.T) {
 	defer Reset()
 
 	executed := false
-	Add("test-ctx-callback", func(ctx context.Context) error {
+	Add("test-ctx-callback", func(_ context.Context) error {
 		executed = true
 		return nil
 	})
@@ -179,6 +180,6 @@ func TestAdd(t *testing.T) {
 		CallbackTimeout: time.Second,
 	})
 
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, executed)
 }

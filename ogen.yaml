@@ -1,0 +1,4 @@
+generator:
+  convenient_errors: "on"
+  content_type_aliases:
+    "text/calendar": "text/plain"

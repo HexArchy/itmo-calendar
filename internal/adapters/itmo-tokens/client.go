@@ -8,6 +8,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const _httpTimeout = 30 * time.Second
+
 // Client is ITMO OAuth tokens client.
 type Client struct {
 	httpClient  *http.Client
@@ -21,13 +23,13 @@ type Client struct {
 func New(clientID, redirectURI, providerURL string, logger *zap.Logger) *Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // G402: ITMO API uses self-signed certificates.
 		},
 	}
 
 	httpClient := &http.Client{
 		Transport: tr,
-		Timeout:   30 * time.Second,
+		Timeout:   _httpTimeout,
 	}
 
 	return &Client{

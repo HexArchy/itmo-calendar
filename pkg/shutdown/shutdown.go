@@ -2,17 +2,23 @@ package shutdown
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 )
 
+const (
+	_signalGracePeriod = 250 * time.Millisecond
+	_forceSignalDelay  = 500 * time.Millisecond
+)
+
 var globalHandler *handler
 
 // init initializes the global shutdown handler and sets up signal handling.
+//
+//nolint:gochecknoinits // init is used here to ensure the shutdown handler is ready before any other code runs.
 func init() {
 	setupHandler()
 }
@@ -25,7 +31,7 @@ func setupHandler() {
 
 	go func() {
 		for sig := range primarySignalCh {
-			fmt.Printf("Signal received: %v\n", sig)
+			slog.Info("Signal received", "signal", sig)
 
 			if globalHandler.isShuttingDown() {
 				select {
@@ -89,7 +95,8 @@ func Wait(config *Config) error {
 		globalHandler.setShuttingDown()
 	}
 
-	log.Println("Shutdown signal received, initiating graceful shutdown...")
+	//nolint:sloglint // pkg shutdown should not depend on app logger.
+	slog.Info("Shutdown signal received, initiating graceful shutdown")
 
 	done := make(chan struct{})
 	timer := time.NewTimer(cfg.WaitTimeout)
@@ -101,7 +108,7 @@ func Wait(config *Config) error {
 	var execErr error
 	go func() {
 		if cfg.Delay > 0 {
-			log.Printf("Waiting %v before shutting down...", cfg.Delay)
+			slog.Info("Waiting before shutting down", "delay", cfg.Delay)
 			time.Sleep(cfg.Delay)
 		}
 
@@ -109,15 +116,15 @@ func Wait(config *Config) error {
 		for i := len(callbacks) - 1; i >= 0; i-- {
 			cb := callbacks[i]
 
-			log.Printf("Executing shutdown callback: %s", cb.Name)
+			slog.Info("Executing shutdown callback", "name", cb.Name)
 
 			if err := executeCallback(cb, cfg.CallbackTimeout); err != nil {
-				log.Printf("Shutdown callback '%s' failed: %v", cb.Name, err)
+				slog.Error("Shutdown callback failed", "name", cb.Name, "error", err)
 				if execErr == nil {
 					execErr = err
 				}
 			} else {
-				log.Printf("Shutdown callback '%s' completed successfully", cb.Name)
+				slog.Info("Shutdown callback completed successfully", "name", cb.Name)
 			}
 		}
 
@@ -130,7 +137,7 @@ func Wait(config *Config) error {
 	// to avoid interpreting the same signal as both normal and force shutdown.
 	go func() {
 		// Wait for a short time to avoid capturing the same signal twice.
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(_signalGracePeriod)
 
 		// Now start listening for force signals.
 		signal.Notify(secondSignalCh, syscall.SIGINT, syscall.SIGTERM)
@@ -138,7 +145,7 @@ func Wait(config *Config) error {
 		// Forward any signals to the force channel.
 		for sig := range secondSignalCh {
 			// Ensure it's actually a second signal, not just latency from the first.
-			if time.Since(shutdownStartTime) > 500*time.Millisecond {
+			if time.Since(shutdownStartTime) > _forceSignalDelay {
 				globalHandler.forceCh <- sig
 				return
 			}
@@ -150,13 +157,16 @@ func Wait(config *Config) error {
 
 	select {
 	case <-done:
-		log.Println("Graceful shutdown completed")
+		//nolint:sloglint // pkg shutdown should not depend on app logger.
+		slog.Info("Graceful shutdown completed")
 		return execErr
 	case <-globalHandler.forceCh:
-		log.Println("Force shutdown signal received")
+		//nolint:sloglint // pkg shutdown should not depend on app logger.
+		slog.Info("Force shutdown signal received")
 		return ErrForceShutdown
 	case <-timer.C:
-		log.Println("Shutdown timeout exceeded")
+		//nolint:sloglint // pkg shutdown should not depend on app logger.
+		slog.Info("Shutdown timeout exceeded")
 		return ErrTimeoutExceeded
 	}
 }

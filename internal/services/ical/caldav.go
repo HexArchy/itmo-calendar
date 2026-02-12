@@ -4,12 +4,25 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
-	"github.com/hexarchy/itmo-calendar/internal/entities"
-
 	ics "github.com/arran4/golang-ical"
+
+	"github.com/hexarchy/itmo-calendar/internal/entities"
+)
+
+var (
+	formatRegex   = regexp.MustCompile(`Формат:\s*(.+)`)
+	groupRegex    = regexp.MustCompile(`Группа:\s*(.+)`)
+	noteRegex     = regexp.MustCompile(`Заметки:\s*(.+)`)
+	zoomRegex     = regexp.MustCompile(`Zoom:\s*(.+)`)
+	audienceRegex = regexp.MustCompile(`(.+?)\s*Аудитория:\s*(.+)`)
+	uidReplacer   = strings.NewReplacer(
+		" ", "-", ":", "", ";", "", ",", "",
+		"(", "", ")", "", "<", "", ">", "", "@", "-at-",
+	)
 )
 
 type Service struct{}
@@ -83,7 +96,7 @@ func (s *Service) Generate(_ context.Context, schedule []entities.DaySchedule) (
 	return cal, nil
 }
 
-// Parse converts iCalendar data into DaySchedule entities.
+//nolint:gocognit // parsing logic is inherently complex.
 func (s *Service) Parse(_ context.Context, cal *ics.Calendar) ([]entities.DaySchedule, error) {
 	scheduleMap := make(map[string]*entities.DaySchedule)
 
@@ -146,14 +159,9 @@ func (s *Service) Parse(_ context.Context, cal *ics.Calendar) ([]entities.DaySch
 		schedule = append(schedule, *daySchedule)
 	}
 
-	// Sort schedule by date (simple bubble sort for small datasets)
-	for i := 0; i < len(schedule)-1; i++ {
-		for j := 0; j < len(schedule)-i-1; j++ {
-			if schedule[j].Date.After(schedule[j+1].Date) {
-				schedule[j], schedule[j+1] = schedule[j+1], schedule[j]
-			}
-		}
-	}
+	sort.Slice(schedule, func(i, j int) bool {
+		return schedule[i].Date.Before(schedule[j].Date)
+	})
 
 	return schedule, nil
 }
@@ -170,32 +178,24 @@ func (s *Service) parseDescription(description string, lesson *entities.Lesson) 
 		lesson.Type = strings.TrimSpace(lines[1])
 	}
 
-	// Parse additional fields using regex patterns
-	formatRegex := regexp.MustCompile(`Формат:\s*(.+)`)
-	groupRegex := regexp.MustCompile(`Группа:\s*(.+)`)
-	noteRegex := regexp.MustCompile(`Заметки:\s*(.+)`)
-	zoomRegex := regexp.MustCompile(`Zoom:\s*(.+)`)
-
 	for _, line := range lines[2:] {
 		line = strings.TrimSpace(line)
 
 		if match := formatRegex.FindStringSubmatch(line); len(match) > 1 {
 			lesson.Format = strings.TrimSpace(match[1])
-		} else if match := groupRegex.FindStringSubmatch(line); len(match) > 1 {
-			lesson.Group = strings.TrimSpace(match[1])
-		} else if match := noteRegex.FindStringSubmatch(line); len(match) > 1 {
-			lesson.Note = strings.TrimSpace(match[1])
-		} else if match := zoomRegex.FindStringSubmatch(line); len(match) > 1 {
-			lesson.ZoomURL = strings.TrimSpace(match[1])
+		} else if matchGroup := groupRegex.FindStringSubmatch(line); len(matchGroup) > 1 {
+			lesson.Group = strings.TrimSpace(matchGroup[1])
+		} else if matchNote := noteRegex.FindStringSubmatch(line); len(matchNote) > 1 {
+			lesson.Note = strings.TrimSpace(matchNote[1])
+		} else if matchZoom := zoomRegex.FindStringSubmatch(line); len(matchZoom) > 1 {
+			lesson.ZoomURL = strings.TrimSpace(matchZoom[1])
 		}
 	}
 }
 
 // parseLocation extracts building and room information from location string.
 func (s *Service) parseLocation(location string, lesson *entities.Lesson) {
-	// Expected format: "Building Аудитория: Room"
-	audienceRegex := regexp.MustCompile(`(.+?)\s*Аудитория:\s*(.+)`)
-
+	//nolint:mnd // checking for building and room in regex submatch.
 	if match := audienceRegex.FindStringSubmatch(location); len(match) > 2 {
 		lesson.Building = strings.TrimSpace(match[1])
 		lesson.Room = strings.TrimSpace(match[2])
@@ -207,16 +207,5 @@ func (s *Service) parseLocation(location string, lesson *entities.Lesson) {
 
 // sanitizeUID removes special characters from strings to create valid UIDs.
 func sanitizeUID(input string) string {
-	replacer := strings.NewReplacer(
-		" ", "-",
-		":", "",
-		";", "",
-		",", "",
-		"(", "",
-		")", "",
-		"<", "",
-		">", "",
-		"@", "-at-",
-	)
-	return replacer.Replace(input)
+	return uidReplacer.Replace(input)
 }

@@ -21,19 +21,29 @@ import (
 // Repository provides access to user tokens storage.
 type Repository struct {
 	db     *pgxpool.Pool
-	secret []byte
+	aesGCM cipher.AEAD
 	logger *zap.Logger
 }
 
 // New creates a new Repository instance.
-func New(db *pgxpool.Pool, secret string, logger *zap.Logger) *Repository {
+func New(db *pgxpool.Pool, secret string, logger *zap.Logger) (*Repository, error) {
 	key := sha256.Sum256([]byte(secret))
+
+	block, err := aes.NewCipher(key[:])
+	if err != nil {
+		return nil, errors.Wrap(err, "new cipher")
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, errors.Wrap(err, "new gcm")
+	}
 
 	return &Repository{
 		db:     db,
-		secret: key[:],
+		aesGCM: aesGCM,
 		logger: logger.With(zap.String("component", "user_tokens_repository")),
-	}
+	}, nil
 }
 
 // Get retrieves user tokens by ISU.
@@ -61,10 +71,9 @@ LIMIT 1`
 		&tokens.CreatedAt,
 		&tokens.UpdatedAt,
 	)
-
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
+			return &entities.UserTokens{}, nil
 		}
 		return nil, errors.Wrap(err, "scan user tokens")
 	}
@@ -132,7 +141,6 @@ ON CONFLICT (isu) DO UPDATE SET
 		tokens.CreatedAt,
 		tokens.UpdatedAt,
 	)
-
 	if err != nil {
 		return errors.Wrap(err, "upsert user tokens")
 	}
@@ -146,23 +154,12 @@ ON CONFLICT (isu) DO UPDATE SET
 
 // encrypt encrypts a plaintext string using AES-GCM.
 func (r *Repository) encrypt(plaintext string) (string, error) {
-	block, err := aes.NewCipher(r.secret)
-	if err != nil {
-		return "", errors.Wrap(err, "new cipher")
-	}
-
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", errors.Wrap(err, "new gcm")
-	}
-
-	nonce := make([]byte, aesGCM.NonceSize())
-	if _, err = io.ReadFull(rand.Reader, nonce); err != nil {
+	nonce := make([]byte, r.aesGCM.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", errors.Wrap(err, "generate nonce")
 	}
 
-	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
-
+	ciphertext := r.aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
 	return hex.EncodeToString(ciphertext), nil
 }
 
@@ -173,23 +170,13 @@ func (r *Repository) decrypt(encrypted string) (string, error) {
 		return "", errors.Wrap(err, "hex decode")
 	}
 
-	block, err := aes.NewCipher(r.secret)
-	if err != nil {
-		return "", errors.Wrap(err, "new cipher")
-	}
-
-	aesGCM, err := cipher.NewGCM(block)
-	if err != nil {
-		return "", errors.Wrap(err, "new gcm")
-	}
-
-	nonceSize := aesGCM.NonceSize()
+	nonceSize := r.aesGCM.NonceSize()
 	if len(ciphertext) < nonceSize {
 		return "", errors.New("ciphertext too short")
 	}
 
 	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
-	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	plaintext, err := r.aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
 		return "", errors.Wrap(err, "decrypt")
 	}

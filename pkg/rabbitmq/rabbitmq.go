@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"maps"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -12,6 +13,8 @@ import (
 	amqp "github.com/rabbitmq/amqp091-go"
 	"go.uber.org/zap"
 )
+
+const _reconnectTimeout = 5 * time.Second
 
 type Client struct {
 	conn      *amqp.Connection
@@ -61,6 +64,8 @@ func New(ctx context.Context, dsn string, tls *tls.Config, logger *zap.Logger) (
 }
 
 // DefineQueue registers a queue and launches producers and consumers.
+//
+//nolint:gocognit
 func (s *Client) DefineQueue(
 	ctx context.Context,
 	queueName string,
@@ -86,10 +91,10 @@ func (s *Client) DefineQueue(
 	// Producers.
 	if _, ok := s.producers[queueName]; !ok {
 		s.producers[queueName] = make([]*amqp.Channel, 0, numProducers)
-		for i := 0; i < numProducers; i++ {
-			prodCh, err := s.conn.Channel()
-			if err != nil {
-				return errors.Wrap(err, "producer channel")
+		for range numProducers {
+			prodCh, prodErr := s.conn.Channel()
+			if prodErr != nil {
+				return errors.Wrap(prodErr, "producer channel")
 			}
 			s.producers[queueName] = append(s.producers[queueName], prodCh)
 		}
@@ -98,20 +103,20 @@ func (s *Client) DefineQueue(
 	}
 
 	// Consumers.
-	for i := 0; i < numConsumers; i++ {
-		cch, err := s.conn.Channel()
-		if err != nil {
-			return errors.Wrap(err, "consumer channel")
+	for range numConsumers {
+		cch, consErr := s.conn.Channel()
+		if consErr != nil {
+			return errors.Wrap(consErr, "consumer channel")
 		}
 		cons := &consumer{
 			ch:     cch,
 			doneCh: make(chan struct{}),
 		}
-		msgs, err := cch.Consume(
+		msgs, consumeErr := cch.Consume(
 			queueName, "", false, false, false, false, nil,
 		)
-		if err != nil {
-			return errors.Wrap(err, "consume")
+		if consumeErr != nil {
+			return errors.Wrap(consumeErr, "consume")
 		}
 
 		go func() {
@@ -136,22 +141,22 @@ func (s *Client) DefineQueue(
 						return
 					}
 					var m Message
-					err := json.Unmarshal(msg.Body, &m)
-					if err != nil {
+					unmarshalErr := json.Unmarshal(msg.Body, &m)
+					if unmarshalErr != nil {
 						s.logger.Error("failed to unmarshal message",
 							zap.String("queue", queueName),
-							zap.Error(err),
+							zap.Error(unmarshalErr),
 						)
 						_ = msg.Nack(false, false)
 						continue
 					}
-					err = processFunc(ctx, &m)
-					if err == nil {
+					processErr := processFunc(ctx, &m)
+					if processErr == nil {
 						_ = msg.Ack(false)
 					} else {
 						s.logger.Error("processFunc error",
 							zap.String("queue", queueName),
-							zap.Error(err),
+							zap.Error(processErr),
 						)
 						_ = msg.Nack(false, true)
 					}
@@ -179,9 +184,7 @@ func (s *Client) SendMessage(ctx context.Context, queueName string, message *Mes
 	}
 
 	headers := amqp.Table{}
-	for k, v := range message.Headers {
-		headers[k] = v
-	}
+	maps.Copy(headers, message.Headers)
 
 	val, ok := s.rrIdx.Load(queueName)
 	if !ok {
@@ -193,6 +196,7 @@ func (s *Client) SendMessage(ctx context.Context, queueName string, message *Mes
 	}
 
 	idx := atomic.AddUint64(idxPtr, 1) - 1
+	//nolint:gosec // G115: idx % len(prodChans) is always within int range.
 	ch := prodChans[int(idx)%len(prodChans)]
 
 	return ch.PublishWithContext(ctx, "", queueName, false, false, amqp.Publishing{
@@ -223,7 +227,7 @@ func (s *Client) Close() error {
 			_ = cons.ch.Close()
 			select {
 			case <-cons.doneCh:
-			case <-time.After(5 * time.Second):
+			case <-time.After(_reconnectTimeout):
 			}
 		}
 	}

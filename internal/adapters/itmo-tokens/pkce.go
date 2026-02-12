@@ -6,9 +6,11 @@ import (
 	"encoding/base64"
 )
 
+const _pkceVerifierLen = 40
+
 // generateCodeVerifier creates a random code verifier for PKCE.
 func generateCodeVerifier() (string, error) {
-	b := make([]byte, 40)
+	b := make([]byte, _pkceVerifierLen)
 	_, err := rand.Read(b)
 	if err != nil {
 		return "", err

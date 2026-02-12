@@ -9,6 +9,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	_numProducers = 4
+	_numConsumers = 4
+)
+
 type UseCase interface {
 	Execute(ctx context.Context, isus []int64) error
 }
@@ -58,8 +63,8 @@ func (w *Worker) Start(ctx context.Context) error {
 	err := w.rabbit.DefineQueue(
 		ctx,
 		w.queue,
-		4, // TODO: make it configurable.
-		4, // TODO: make it configurable.
+		_numProducers,
+		_numConsumers,
 		processFunc,
 	)
 	if err != nil {

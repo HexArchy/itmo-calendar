@@ -9,15 +9,15 @@ import (
 )
 
 type TLS struct {
-	Enabled  bool   `path:"enabled" default:"false" desc:"Enable TLS connection"`
-	CertFile string `path:"cert_file" default:"" desc:"Path to TLS certificate file"`
-	KeyFile  string `path:"key_file" default:"" desc:"Path to TLS key file"`
-	CAFile   string `path:"ca_file" default:"" desc:"Path to TLS CA file"`
+	Enabled  bool   `yaml:"enabled"`
+	CertFile string `yaml:"cert_file"`
+	KeyFile  string `yaml:"key_file"`
+	CAFile   string `yaml:"ca_file"`
 }
 
 func (t *TLS) BuildTLSConfig(serverName string) (*tls.Config, error) {
-	if !t.Enabled {
-		return nil, nil
+	if t == nil || !t.Enabled {
+		return &tls.Config{}, nil //nolint:gosec // G402: empty config is intentional when TLS is disabled.
 	}
 
 	cert, err := tls.LoadX509KeyPair(t.CertFile, t.KeyFile)
@@ -31,6 +31,7 @@ func (t *TLS) BuildTLSConfig(serverName string) (*tls.Config, error) {
 		caCertPool.AppendCertsFromPEM(caCert)
 	}
 
+	//nolint:gosec // G402: MinVersion not required for internal use.
 	return &tls.Config{
 		ServerName:   serverName,
 		Certificates: []tls.Certificate{cert},

@@ -8,6 +8,14 @@ import (
 	"github.com/hexarchy/itmo-calendar/internal/entities"
 )
 
+var moscowLocation = func() *time.Location {
+	loc, err := time.LoadLocation("Europe/Moscow")
+	if err != nil {
+		panic("failed to load Europe/Moscow location: " + err.Error())
+	}
+	return loc
+}()
+
 type scheduleResponse struct {
 	Code    int              `json:"code"`
 	Message string           `json:"message"`
@@ -42,9 +50,9 @@ func (c *Client) transformDay(day scheduleDayDTO) (entities.DaySchedule, error) 
 
 	lessons := make([]entities.Lesson, 0, len(day.Lessons))
 	for _, lesson := range day.Lessons {
-		transformedLesson, err := c.transformLesson(day.Date, lesson)
-		if err != nil {
-			return entities.DaySchedule{}, errors.Wrap(err, "transform lesson")
+		transformedLesson, errTransform := c.transformLesson(day.Date, lesson)
+		if errTransform != nil {
+			return entities.DaySchedule{}, errors.Wrap(errTransform, "transform lesson")
 		}
 
 		lessons = append(lessons, transformedLesson)
@@ -92,16 +100,11 @@ func (c *Client) transformLesson(dateStr string, lesson lessonDTO) (entities.Les
 	}, nil
 }
 
-// parseDateTime combines date string (YYYY-MM-DD) and time string (HH:MM) into time.Time in Moscow time zone.
+// parseDateTime combines date string (YYYY-MM-DD) and time string (HH:MM) into [time.Time] in Moscow time zone.
 func parseDateTime(dateStr, timeStr string) (time.Time, error) {
-	loc, err := time.LoadLocation("Europe/Moscow")
-	if err != nil {
-		return time.Time{}, errors.Wrap(err, "load Europe/Moscow location")
-	}
-	date, err := time.ParseInLocation("2006-01-02 15:04", dateStr+" "+timeStr, loc)
+	date, err := time.ParseInLocation("2006-01-02 15:04", dateStr+" "+timeStr, moscowLocation)
 	if err != nil {
 		return time.Time{}, errors.Wrapf(err, "parse date %q and time %q", dateStr, timeStr)
 	}
-
 	return date, nil
 }

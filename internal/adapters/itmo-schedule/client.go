@@ -14,6 +14,8 @@ import (
 	"github.com/hexarchy/itmo-calendar/internal/entities"
 )
 
+const _httpTimeout = 30 * time.Second
+
 const (
 	_basePath = "/schedule/schedule/personal"
 )
@@ -28,13 +30,13 @@ type Client struct {
 func New(baseURL string) *Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true,
+			InsecureSkipVerify: true, //nolint:gosec // G402: ITMO API uses self-signed certificates.
 		},
 	}
 
 	httpClient := &http.Client{
 		Transport: tr,
-		Timeout:   30 * time.Second,
+		Timeout:   _httpTimeout,
 	}
 
 	return &Client{

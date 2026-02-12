@@ -1,6 +1,7 @@
 .certs
-.env.prod
+.claude/
+.env
+.env.*
+CLAUDE.md
 /bin
-/bin/*
 /certs
-/certs/*

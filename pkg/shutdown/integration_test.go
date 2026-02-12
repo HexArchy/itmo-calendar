@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIntegrationFullWorkflow(t *testing.T) {
@@ -21,8 +22,8 @@ func TestIntegrationFullWorkflow(t *testing.T) {
 		contextCanceled bool
 	)
 
-	for i := 0; i < 3; i++ {
-		Add("test-callback", func(ctx context.Context) error {
+	for range 3 {
+		Add("test-callback", func(_ context.Context) error {
 			mu.Lock()
 			callbackCounter++
 			mu.Unlock()
@@ -48,7 +49,7 @@ func TestIntegrationFullWorkflow(t *testing.T) {
 		CallbackTimeout: time.Second,
 	})
 
-	assert.NoError(t, err, "Expected no errors during shutdown")
+	require.NoError(t, err, "Expected no errors during shutdown")
 
 	mu.Lock()
 	assert.Equal(t, 3, callbackCounter, "All callbacks should have executed")
@@ -60,20 +61,20 @@ func TestReuseAfterReset(t *testing.T) {
 	Reset()
 
 	executed1 := false
-	Add("test-1", func(ctx context.Context) error {
+	Add("test-1", func(_ context.Context) error {
 		executed1 = true
 		return nil
 	})
 
 	Shutdown()
-	Wait(nil)
+	_ = Wait(nil)
 
 	assert.True(t, executed1, "First callback should have executed")
 
 	Reset()
 
 	executed2 := false
-	Add("test-2", func(ctx context.Context) error {
+	Add("test-2", func(_ context.Context) error {
 		executed2 = true
 		return nil
 	})
@@ -81,7 +82,7 @@ func TestReuseAfterReset(t *testing.T) {
 	assert.False(t, IsShuttingDown(), "Status should be reset")
 
 	Shutdown()
-	Wait(nil)
+	_ = Wait(nil)
 
 	assert.True(t, executed2, "Second callback should have executed")
 }

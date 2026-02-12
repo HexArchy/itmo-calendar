@@ -7,9 +7,10 @@ import (
 	"go.uber.org/zap"
 )
 
-// ResponseWriter wraps http.ResponseWriter to capture metrics.
+// ResponseWriter wraps [http.ResponseWriter] to capture metrics.
 type ResponseWriter struct {
 	http.ResponseWriter
+
 	status int
 	size   int
 }

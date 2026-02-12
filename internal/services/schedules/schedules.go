@@ -26,7 +26,12 @@ func New(schedule ScheduleRepo, tokens Tokens, userTokens UserTokensRepo) *Servi
 }
 
 // GetByCreds retrieves schedule using ISU credentials and stores tokens.
-func (s *Service) GetByCreds(ctx context.Context, isu int64, password string, from, to time.Time) ([]entities.DaySchedule, error) {
+func (s *Service) GetByCreds(
+	ctx context.Context,
+	isu int64,
+	password string,
+	from, to time.Time,
+) ([]entities.DaySchedule, error) {
 	tokens, err := s.tokens.Get(ctx, isu, password)
 	if err != nil {
 		return nil, errors.Wrap(err, "get tokens")
@@ -62,14 +67,14 @@ func (s *Service) GetByISU(ctx context.Context, isu int64, from, to time.Time) (
 			return nil, errors.New("refresh token expired")
 		}
 
-		newTokens, err := s.tokens.Refresh(ctx, isu, tokens.RefreshToken)
-		if err != nil {
-			return nil, errors.Wrap(err, "refresh tokens")
+		newTokens, errRefresh := s.tokens.Refresh(ctx, isu, tokens.RefreshToken)
+		if errRefresh != nil {
+			return nil, errors.Wrap(errRefresh, "refresh tokens")
 		}
 
-		err = s.userTokens.UpsertUserTokens(ctx, newTokens)
-		if err != nil {
-			return nil, errors.Wrap(err, "upsert refreshed tokens")
+		errUpsert := s.userTokens.UpsertUserTokens(ctx, newTokens)
+		if errUpsert != nil {
+			return nil, errors.Wrap(errUpsert, "upsert refreshed tokens")
 		}
 
 		tokens = newTokens

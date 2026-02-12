@@ -77,10 +77,10 @@ func TestHandlerConcurrentAccess(t *testing.T) {
 	done := make(chan struct{})
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			h.addCallback(&Callback{
 				Name:  "concurrent-test",
-				FnCtx: func(context.Context) error { return nil },
+				FnCtx: func(_ context.Context) error { return nil },
 			})
 		}
 		close(done)
@@ -89,10 +89,10 @@ func TestHandlerConcurrentAccess(t *testing.T) {
 	done2 := make(chan struct{})
 
 	go func() {
-		for i := 0; i < 100; i++ {
+		for range 100 {
 			h.addSystemCallback(&Callback{
 				Name:  "concurrent-system-test",
-				FnCtx: func(context.Context) error { return nil },
+				FnCtx: func(_ context.Context) error { return nil },
 			})
 		}
 		close(done2)

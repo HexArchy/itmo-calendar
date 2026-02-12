@@ -3,8 +3,9 @@ package getschedule
 import (
 	"context"
 
-	"github.com/hexarchy/itmo-calendar/internal/entities"
 	"github.com/pkg/errors"
+
+	"github.com/hexarchy/itmo-calendar/internal/entities"
 )
 
 type UseCase struct {

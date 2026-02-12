@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"html"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,6 +20,8 @@ import (
 )
 
 // Get performs OAuth2 Authorization Code Flow with PKCE and returns tokens.
+//
+//nolint:funlen // OAuth PKCE flow requires many steps.
 func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities.UserTokens, error) {
 	codeVerifier, err := generateCodeVerifier()
 	if err != nil {
@@ -45,7 +48,10 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 	}
 
 	// Set request headers to mimic a browser
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36")
+	req.Header.Set(
+		"User-Agent",
+		"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.110 Safari/537.36",
+	)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
@@ -74,9 +80,7 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 	}
 
 	// Add any session-specific parameters found in the form
-	for k, v := range sessionParams {
-		form[k] = v
-	}
+	maps.Copy(form, sessionParams)
 
 	formReq, err := http.NewRequestWithContext(ctx, http.MethodPost, formAction, strings.NewReader(form.Encode()))
 	if err != nil {
@@ -91,7 +95,7 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 		formReq.AddCookie(cookie)
 	}
 
-	c.httpClient.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+	c.httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
 		return http.ErrUseLastResponse
 	}
 	defer func() {
@@ -202,7 +206,7 @@ func (c *Client) exchangeCode(ctx context.Context, code, codeVerifier string) (*
 func (c *Client) extractLoginFormData(htmlContent string) (string, map[string][]string, error) {
 	formActionRe := regexp.MustCompile(`(?s)<form[^>]*\s+id="kc-form-login"[^>]*\s+action="([^"]+)"`)
 	matches := formActionRe.FindStringSubmatch(htmlContent)
-	if len(matches) < 2 {
+	if len(matches) < 2 { //nolint:mnd // regex submatch index.
 		c.logger.Debug("form", zap.String("html", htmlContent))
 		return "", nil, errors.New("form action not found")
 	}
@@ -214,7 +218,7 @@ func (c *Client) extractLoginFormData(htmlContent string) (string, map[string][]
 
 	params := make(map[string][]string)
 	for _, match := range paramMatches {
-		if len(match) >= 3 {
+		if len(match) >= 3 { //nolint:mnd // regex submatch index.
 			params[match[1]] = []string{html.UnescapeString(match[2])}
 		}
 	}
@@ -250,8 +254,8 @@ func (c *Client) Refresh(ctx context.Context, isu int64, refreshToken string) (*
 		AccessTokenExpiresIn  int64  `json:"expires_in"`
 		RefreshTokenExpiresIn int64  `json:"refresh_expires_in"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenData); err != nil {
-		return nil, errors.Wrap(err, "decode refresh response")
+	if errDecode := json.NewDecoder(resp.Body).Decode(&tokenData); errDecode != nil {
+		return nil, errors.Wrap(errDecode, "decode refresh response")
 	}
 
 	now := time.Now()
