@@ -11,26 +11,29 @@ Syncs your ITMO University schedule to any calendar app. Authenticates via ITMO 
 
 ## Add to your calendar
 
-### Apple Calendar (iPhone / Mac)
+### Apple Calendar (iPhone / Mac) — CalDAV
 
-1. **Settings** > **Calendar** > **Accounts** > **Add Account** > **Other** > **Add Subscribed Calendar**
-2. Enter the URL:
-   ```
-   https://itmo-calendar.duckdns.org/cal
-   ```
-3. When prompted for credentials:
+1. **Settings** > **Calendar** > **Accounts** > **Add Account** > **Other** > **Add CalDAV Account**
+2. Enter:
+   - **Server:** `itmo-calendar.duckdns.org`
    - **Username:** your ISU number (e.g. `123456`)
    - **Password:** your ITMO password
-4. Done. Calendar will refresh automatically.
+3. Done. Calendar "ITMO Schedule" will appear and refresh automatically.
 
-### Google Calendar
+### Google Calendar / Android
 
-Google Calendar does not support authenticated calendar subscriptions natively. Use one of these options:
-
-- **On Android:** use a CalDAV-compatible app ([DAVx5](https://www.davx5.com/), [ICSx5](https://icsx5.bitfire.at/)) and add the URL above
-- **On desktop:** subscribe through a CalDAV client (Thunderbird, GNOME Calendar)
+- **Android:** use [DAVx5](https://www.davx5.com/) → Add CalDAV account → `https://itmo-calendar.duckdns.org/caldav/` with ISU + password
+- **Desktop:** Thunderbird, GNOME Calendar — add CalDAV account with the same URL
 
 ### Any CalDAV client
+
+Server: `https://itmo-calendar.duckdns.org`
+CalDAV path: `/caldav/` (auto-discovery via `/.well-known/caldav`)
+Auth: HTTP Basic (`ISU:password`)
+
+### iCal subscription (legacy)
+
+For clients that only support iCal subscriptions (not CalDAV):
 
 URL: `https://itmo-calendar.duckdns.org/cal`
 Auth: HTTP Basic (`ISU:password`)
@@ -43,6 +46,9 @@ Base URL: `https://itmo-calendar.duckdns.org`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `PROPFIND` | `/caldav/{isu}/` | CalDAV principal (Basic Auth) |
+| `PROPFIND` | `/caldav/{isu}/calendars/schedule/` | CalDAV calendar collection |
+| `GET` | `/.well-known/caldav` | CalDAV auto-discovery redirect |
 | `GET` | `/cal` | iCal feed (Basic Auth) |
 | `GET` | `/api/v1/health` | Health check |
 | `POST` | `/api/v1/subscribe` | Subscribe by ISU + password |
