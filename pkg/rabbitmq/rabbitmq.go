@@ -19,6 +19,7 @@ const (
 	_defaultMaxRetries     = 3
 	_defaultReconnectDelay = 1 * time.Second
 	_maxReconnectBackoff   = 30 * time.Second
+	_backoffMultiplier     = 2
 )
 
 type Client struct {
@@ -176,7 +177,7 @@ func (s *Client) reconnect() {
 				zap.Int("attempt", attempts),
 				zap.Error(err),
 			)
-			delay = min(delay*2, _maxReconnectBackoff)
+			delay = min(delay*_backoffMultiplier, _maxReconnectBackoff)
 			continue
 		}
 
@@ -192,7 +193,7 @@ func (s *Client) reconnect() {
 				zap.Error(recreateErr),
 			)
 			_ = conn.Close()
-			delay = min(delay*2, _maxReconnectBackoff)
+			delay = min(delay*_backoffMultiplier, _maxReconnectBackoff)
 			continue
 		}
 
