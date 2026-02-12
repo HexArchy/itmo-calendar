@@ -151,6 +151,10 @@ func newCalDAVInterceptor(
 				http.Redirect(w, r, "/caldav/", http.StatusPermanentRedirect)
 			case r.URL.Path == "/caldav":
 				http.Redirect(w, r, "/caldav/", http.StatusMovedPermanently)
+			case r.URL.Path == "/principals" || r.URL.Path == "/principals/":
+				caldavMux.ServeHTTP(w, withRewrittenPath(r, "/caldav/"))
+			case strings.HasPrefix(r.URL.Path, "/calendar/dav/"):
+				caldavMux.ServeHTTP(w, withRewrittenPath(r, "/caldav/"))
 			case strings.HasPrefix(r.URL.Path, "/caldav/"):
 				caldavMux.ServeHTTP(w, r)
 			default:
@@ -158,4 +162,16 @@ func newCalDAVInterceptor(
 			}
 		})
 	}
+}
+
+func withRewrittenPath(r *http.Request, newPath string) *http.Request {
+	if r.URL.Path == newPath {
+		return r
+	}
+
+	clone := r.Clone(r.Context())
+	clone.URL.Path = newPath
+	clone.URL.RawPath = newPath
+
+	return clone
 }
