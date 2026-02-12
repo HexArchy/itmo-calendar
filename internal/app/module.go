@@ -11,6 +11,7 @@ import (
 	usertokensrepo "github.com/hexarchy/itmo-calendar/internal/adapters/repositories/user-tokens"
 	usersrepo "github.com/hexarchy/itmo-calendar/internal/adapters/repositories/users"
 	"github.com/hexarchy/itmo-calendar/internal/config"
+	caldavhandler "github.com/hexarchy/itmo-calendar/internal/handlers/caldav"
 	httpserver "github.com/hexarchy/itmo-calendar/internal/handlers/http"
 	api "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1"
 	sendscheduleworker "github.com/hexarchy/itmo-calendar/internal/handlers/workers/send-schedule"
@@ -64,6 +65,7 @@ var Module = fx.Options(
 
 	// handlers
 	api.Module,
+	caldavhandler.Module,
 	httpserver.Module,
 	sendscheduleworker.Module,
 

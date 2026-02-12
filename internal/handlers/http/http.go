@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/emersion/go-webdav/caldav"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -14,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
+	caldavhandler "github.com/hexarchy/itmo-calendar/internal/handlers/caldav"
 	"github.com/hexarchy/itmo-calendar/internal/handlers/http/v1/gen"
 
 	api "github.com/hexarchy/itmo-calendar/internal/handlers/http/v1"
@@ -28,8 +30,15 @@ type Server struct {
 	config *Config
 }
 
-// NewServer creates a new HTTP server with ogen handler, Scalar docs and debug routes.
-func NewServer(ogenSrv *gen.Server, calHandler *CalHandler, cfg *Config, logger *zap.Logger) *Server {
+// NewServer creates a new HTTP server with ogen handler, CalDAV handler, Scalar docs and debug routes.
+func NewServer(
+	ogenSrv *gen.Server,
+	calHandler *CalHandler,
+	caldavHandler *caldav.Handler,
+	caldavAuth *caldavhandler.AuthMiddleware,
+	cfg *Config,
+	logger *zap.Logger,
+) *Server {
 	srvLogger := logger.With(zap.String("component", "http_server"))
 
 	r := chi.NewRouter()
@@ -41,8 +50,8 @@ func NewServer(ogenSrv *gen.Server, calHandler *CalHandler, cfg *Config, logger 
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
-		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-ID"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PROPFIND", "REPORT"},
+		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-ID", "Depth"},
 	}))
 
 	// Rate-limited routes
@@ -51,6 +60,14 @@ func NewServer(ogenSrv *gen.Server, calHandler *CalHandler, cfg *Config, logger 
 		r.Mount("/api/v1", ogenSrv)
 		r.Handle("/cal", calHandler)
 	})
+
+	// Well-known CalDAV redirect
+	r.Get("/.well-known/caldav", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/caldav/", http.StatusMovedPermanently)
+	})
+
+	// CalDAV server (no rate limiting)
+	r.Mount("/caldav", caldavAuth.Wrap(caldavHandler))
 
 	// Documentation (no rate limiting)
 	r.Handle("/openapi.yaml", api.SpecHandler())
