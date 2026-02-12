@@ -33,8 +33,7 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
-          install-mode: goinstall
+          version: v2.9.0
 
   test:
     name: Test
