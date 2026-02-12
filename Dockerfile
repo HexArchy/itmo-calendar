@@ -13,7 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-w -s" \
     -o /go/bin/itmo-calendar ./cmd/itmo-calendar
 
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN addgroup -S app && adduser -S app -G app
 RUN apk add --no-cache ca-certificates tzdata curl
