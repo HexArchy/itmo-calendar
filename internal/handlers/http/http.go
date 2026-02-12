@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/emersion/go-webdav/caldav"
@@ -54,20 +55,16 @@ func NewServer(
 		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-ID", "Depth"},
 	}))
 
+	// CalDAV interceptor — chi doesn't route PROPFIND/REPORT, so handle
+	// CalDAV paths in middleware before chi's method-based routing.
+	r.Use(newCalDAVInterceptor(caldavAuth, caldavHandler))
+
 	// Rate-limited routes
 	r.Group(func(r chi.Router) {
 		r.Use(httprate.LimitByIP(cfg.RateLimitRPM, time.Minute))
 		r.Mount("/api/v1", ogenSrv)
 		r.Handle("/cal", calHandler)
 	})
-
-	// Well-known CalDAV redirect
-	r.Get("/.well-known/caldav", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/caldav/", http.StatusMovedPermanently)
-	})
-
-	// CalDAV server (no rate limiting)
-	r.Mount("/caldav", caldavAuth.Wrap(caldavHandler))
 
 	// Documentation (no rate limiting)
 	r.Handle("/openapi.yaml", api.SpecHandler())
@@ -138,4 +135,27 @@ func (s *Server) Stop(ctx context.Context) error {
 
 	s.logger.Info("HTTP server stopped")
 	return nil
+}
+
+// newCalDAVInterceptor returns middleware that handles CalDAV paths before
+// chi's method-based routing (chi doesn't support PROPFIND/REPORT methods).
+func newCalDAVInterceptor(
+	auth *caldavhandler.AuthMiddleware,
+	handler *caldav.Handler,
+) func(http.Handler) http.Handler {
+	caldavMux := auth.Wrap(handler)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case r.URL.Path == "/.well-known/caldav":
+				http.Redirect(w, r, "/caldav/", http.StatusPermanentRedirect)
+			case r.URL.Path == "/caldav":
+				http.Redirect(w, r, "/caldav/", http.StatusMovedPermanently)
+			case strings.HasPrefix(r.URL.Path, "/caldav/"):
+				caldavMux.ServeHTTP(w, r)
+			default:
+				next.ServeHTTP(w, r)
+			}
+		})
+	}
 }

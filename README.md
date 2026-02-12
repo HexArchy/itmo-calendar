@@ -41,15 +41,18 @@ Auth: HTTP Basic (`ISU:password`)
 
 Base URL: `https://itmo-calendar.duckdns.org`
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/cal` | iCal feed (Basic Auth) |
-| `GET` | `/api/v1/health` | Health check |
-| `POST` | `/api/v1/subscribe` | Subscribe by ISU + password |
-| `GET` | `/api/v1/{isu}/ical` | Get iCal for user |
-| `GET` | `/api/v1/{isu}/schedule` | Get schedule as JSON |
-| `GET` | `/docs` | Interactive API docs (Scalar) |
-| `GET` | `/openapi.yaml` | OpenAPI spec |
+| Method     | Endpoint                            | Description                    |
+| ---------- | ----------------------------------- | ------------------------------ |
+| `PROPFIND` | `/caldav/{isu}/`                    | CalDAV principal (Basic Auth)  |
+| `PROPFIND` | `/caldav/{isu}/calendars/schedule/` | CalDAV calendar collection     |
+| `GET`      | `/.well-known/caldav`               | CalDAV auto-discovery redirect |
+| `GET`      | `/cal`                              | iCal feed (Basic Auth)         |
+| `GET`      | `/api/v1/health`                    | Health check                   |
+| `POST`     | `/api/v1/subscribe`                 | Subscribe by ISU + password    |
+| `GET`      | `/api/v1/{isu}/ical`                | Get iCal for user              |
+| `GET`      | `/api/v1/{isu}/schedule`            | Get schedule as JSON           |
+| `GET`      | `/docs`                             | Interactive API docs (Scalar)  |
+| `GET`      | `/openapi.yaml`                     | OpenAPI spec                   |
 
 ---
 
