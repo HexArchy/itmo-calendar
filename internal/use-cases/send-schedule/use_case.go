@@ -8,11 +8,13 @@ import (
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
-	_defaultFromTimePeriod = 31  // days.
-	_defaultToTimePeriod   = 120 // days.
+	_fromDays      = 30  // days.
+	_toDays        = 120 // days.
+	_maxConcurrent = 5
 )
 
 type UseCase struct {
@@ -39,20 +41,32 @@ func (u *UseCase) Execute(ctx context.Context, isus []int64) error {
 		return errors.Wrap(err, "find by ids")
 	}
 
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(_maxConcurrent)
+
 	for _, user := range users {
-		if errProcess := u.processSending(ctx, user); errProcess != nil {
-			u.logger.Error("failed to process sending", zap.Error(errProcess), zap.Int64("isu", user.ISU))
-			continue
-		}
-		u.logger.Debug("schedule sent", zap.Int64("isu", user.ISU))
+		user := user
+		g.Go(func() error {
+			if errProcess := u.processSending(gctx, user); errProcess != nil {
+				u.logger.Error("failed to process sending", zap.Error(errProcess), zap.Int64("isu", user.ISU))
+				return nil
+			}
+			u.logger.Debug("schedule sent", zap.Int64("isu", user.ISU))
+			return nil
+		})
+	}
+
+	err = g.Wait()
+	if err != nil {
+		return errors.Wrap(err, "process users")
 	}
 
 	return nil
 }
 
 func (u *UseCase) processSending(ctx context.Context, user entities.User) error {
-	from := time.Now().AddDate(0, 0, -_defaultFromTimePeriod)
-	to := time.Now().AddDate(0, 0, _defaultToTimePeriod)
+	from := time.Now().AddDate(0, 0, -_fromDays)
+	to := time.Now().AddDate(0, 0, _toDays)
 
 	schedule, err := u.schedules.GetByISU(ctx, user.ISU, from, to)
 	if err != nil {

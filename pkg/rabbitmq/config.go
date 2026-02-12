@@ -8,13 +8,16 @@ import (
 
 // Config holds RabbitMQ connection settings.
 type Config struct {
-	Host     string      `yaml:"host"`
-	Port     int         `yaml:"port"`
-	User     string      `yaml:"user"`
-	Password string      `yaml:"password"`
-	VHost    string      `yaml:"vhost"`
-	TLS      *config.TLS `yaml:"tls"`
-	Queues   *Queues     `yaml:"queues"`
+	Host                  string      `yaml:"host"`
+	Port                  int         `yaml:"port"`
+	User                  string      `yaml:"user"`
+	Password              string      `yaml:"password"`
+	VHost                 string      `yaml:"vhost"`
+	TLS                   *config.TLS `yaml:"tls"`
+	Queues                *Queues     `yaml:"queues"`
+	MaxRetries            int         `yaml:"max_retries"`
+	MaxReconnectAttempts  int         `yaml:"max_reconnect_attempts"`
+	InitialReconnectDelay int         `yaml:"initial_reconnect_delay"`
 }
 
 // Queues holds queue names.

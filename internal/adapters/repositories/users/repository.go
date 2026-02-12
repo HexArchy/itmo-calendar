@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/hexarchy/itmo-calendar/internal/entities"
 
@@ -23,22 +22,19 @@ func New(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, isu int64) (*entities.User, error) {
-	user := &entities.User{
-		ISU:       isu,
-		UpdatedAt: time.Now(),
-		CreatedAt: time.Now(),
-	}
-
 	const query = `
 INSERT INTO users (isu, created_at, updated_at)
-VALUES ($1, $2, $3)
+VALUES ($1, NOW(), NOW())
+ON CONFLICT (isu) DO UPDATE SET updated_at = EXCLUDED.updated_at
+RETURNING isu, created_at, updated_at
 	`
-	_, err := r.db.Exec(ctx, query, user.ISU, user.CreatedAt, user.UpdatedAt)
+	var user entities.User
+	err := r.db.QueryRow(ctx, query, isu).Scan(&user.ISU, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, errors.Wrap(err, "insert user")
 	}
 
-	return user, nil
+	return &user, nil
 }
 
 func (r *Repository) GetAll(ctx context.Context) ([]entities.User, error) {
@@ -54,6 +50,37 @@ FROM users
 
 	var users []entities.User
 
+	for rows.Next() {
+		var u entities.User
+		err = rows.Scan(&u.ISU, &u.CreatedAt, &u.UpdatedAt)
+		if err != nil {
+			return nil, errors.Wrap(err, "scan user")
+		}
+		users = append(users, u)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, errors.Wrap(err, "rows error")
+	}
+
+	return users, nil
+}
+
+// GetBatch retrieves a batch of users with pagination.
+func (r *Repository) GetBatch(ctx context.Context, limit, offset int) ([]entities.User, error) {
+	const query = `
+SELECT isu, created_at, updated_at
+FROM users
+ORDER BY isu
+LIMIT $1 OFFSET $2
+	`
+	rows, err := r.db.Query(ctx, query, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, "select users batch")
+	}
+	defer rows.Close()
+
+	var users []entities.User
 	for rows.Next() {
 		var u entities.User
 		err = rows.Scan(&u.ISU, &u.CreatedAt, &u.UpdatedAt)

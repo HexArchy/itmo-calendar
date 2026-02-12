@@ -35,6 +35,14 @@ func (s *Service) GetAll(ctx context.Context) ([]entities.User, error) {
 	return users, nil
 }
 
+func (s *Service) GetBatch(ctx context.Context, limit, offset int) ([]entities.User, error) {
+	users, err := s.repo.GetBatch(ctx, limit, offset)
+	if err != nil {
+		return nil, errors.Wrap(err, "get batch users")
+	}
+	return users, nil
+}
+
 func (s *Service) FindByIDs(ctx context.Context, isus []int64) ([]entities.User, error) {
 	users, err := s.repo.FindByIDs(ctx, isus)
 	if err != nil {

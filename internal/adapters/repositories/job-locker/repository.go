@@ -3,6 +3,7 @@ package joblocker
 import (
 	"context"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
 )
@@ -30,7 +31,9 @@ WHERE job_locks.locked_at < NOW() - INTERVAL '1 minute'
 	var name string
 	err := r.db.QueryRow(ctx, query, jobName).Scan(&name)
 	if err != nil {
-		// If no rows returned, lock was not acquired.
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
 		return false, errors.Wrap(err, "acquire lock")
 	}
 

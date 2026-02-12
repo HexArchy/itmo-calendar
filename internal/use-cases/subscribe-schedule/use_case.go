@@ -8,7 +8,10 @@ import (
 	"go.uber.org/zap"
 )
 
-const _period = 120 // days
+const (
+	_fromDays = 30  // days.
+	_toDays   = 120 // days.
+)
 
 type UseCase struct {
 	schedules Schedules
@@ -27,9 +30,10 @@ func New(schedules Schedules, users Users, iCal ICal, caldav CalDav, logger *zap
 		logger:    logger,
 	}
 }
+
 func (u *UseCase) Execute(ctx context.Context, isu int64, password string) error {
-	from := time.Now().AddDate(0, 0, -30)
-	to := time.Now().AddDate(0, 0, _period)
+	from := time.Now().AddDate(0, 0, -_fromDays)
+	to := time.Now().AddDate(0, 0, _toDays)
 
 	schedule, err := u.schedules.GetByCreds(ctx, isu, password, from, to)
 	if err != nil {

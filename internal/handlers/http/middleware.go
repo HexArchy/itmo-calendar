@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 )
 
@@ -44,10 +45,7 @@ func NewLoggingMiddleware(logger *zap.Logger) func(http.Handler) http.Handler {
 			start := time.Now()
 			rw := NewResponseWriter(w)
 
-			requestID := r.Header.Get("X-Request-ID")
-			if requestID == "" {
-				requestID = "unknown"
-			}
+			requestID := middleware.GetReqID(r.Context())
 
 			logger.Info("Request started",
 				zap.String("request_id", requestID),

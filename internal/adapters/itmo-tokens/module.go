@@ -9,6 +9,6 @@ import (
 
 var Module = fx.Module("adapter-itmo-tokens",
 	fx.Provide(func(cfg *config.ITMO, logger *zap.Logger) *Client {
-		return New(cfg.ClientID, cfg.RedirectURI, cfg.ProviderURL, logger)
+		return New(cfg.ClientID, cfg.RedirectURI, cfg.ProviderURL, cfg.InsecureSkipVerify, logger)
 	}),
 )

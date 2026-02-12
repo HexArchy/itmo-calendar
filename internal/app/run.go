@@ -28,38 +28,73 @@ func Run(
 	locker *joblocker.Repository,
 	rabbitCfg *rabbitmq.Config,
 	l *zap.Logger,
+	shutdowner fx.Shutdowner,
 ) {
+	var cronCtx context.Context
+	var cronCancel context.CancelFunc
+	var workerCtx context.Context
+	var workerCancel context.CancelFunc
+
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
 			l.Info("Starting application components")
 
+			serverErrCh := make(chan error, 1)
 			go func() {
 				if err := srv.Start(); err != nil {
-					l.Error("HTTP server failed", zap.Error(err))
+					l.Error("HTTP server failed to start", zap.Error(err))
+					serverErrCh <- err
 				}
 			}()
 
-			go cronjob.New(
+			cronCtx, cronCancel = context.WithCancel(context.Background())
+			cronRunner := cronjob.New(
 				cronUC,
 				locker,
 				rabbitCfg.Queues.CronProcessScheduleQueue,
 				1*time.Minute,
 				l.With(zap.String("component", "cron-scheduler")),
-			).Start(ctx)
+			)
+			go cronRunner.Start(cronCtx)
 
+			workerCtx, workerCancel = context.WithCancel(context.Background())
+			workerErrCh := make(chan error, 1)
 			go func() {
-				if err := worker.Start(ctx); err != nil {
-					l.Error("Send-schedule worker failed", zap.Error(err))
+				if err := worker.Start(workerCtx); err != nil {
+					l.Error("Send-schedule worker failed to start", zap.Error(err))
+					workerErrCh <- err
 				}
 			}()
+
+			select {
+			case err := <-serverErrCh:
+				l.Error("HTTP server startup failed, shutting down app", zap.Error(err))
+				_ = shutdowner.Shutdown()
+				return err
+			case err := <-workerErrCh:
+				l.Error("Worker startup failed, shutting down app", zap.Error(err))
+				_ = shutdowner.Shutdown()
+				return err
+			case <-time.After(100 * time.Millisecond):
+			}
 
 			return nil
 		},
 		OnStop: func(ctx context.Context) error {
+			l.Info("Stopping application components")
+
+			if cronCancel != nil {
+				cronCancel()
+			}
+			if workerCancel != nil {
+				workerCancel()
+			}
+
 			l.Info("Stopping HTTP server")
 			if err := srv.Stop(ctx); err != nil {
 				l.Error("HTTP server stop failed", zap.Error(err))
 			}
+
 			logger.Sync(l)
 			return nil
 		},

@@ -25,7 +25,7 @@ func (g *GooseLogger) Printf(format string, v ...any) {
 }
 
 func (g *GooseLogger) Fatalf(format string, v ...any) {
-	g.logger.Infof(format, v...)
+	g.logger.Fatalf(format, v...)
 }
 
 func ApplyMigrations(ctx context.Context, logger *zap.Logger, dbString string) error {

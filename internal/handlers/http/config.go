@@ -17,4 +17,7 @@ type Config struct {
 	WriteTimeout time.Duration `yaml:"write_timeout"`
 	IdleTimeout  time.Duration `yaml:"idle_timeout"`
 	EnableHTTP2  bool          `yaml:"enable_http2"`
+
+	PprofEnabled bool `yaml:"pprof_enabled"`
+	RateLimitRPM int  `yaml:"rate_limit_rpm"`
 }

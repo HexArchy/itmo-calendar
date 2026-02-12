@@ -7,6 +7,8 @@ import (
 )
 
 var Module = fx.Module("api-v1",
+	fx.Provide(NewDBHealthChecker),
+	fx.Provide(func(hc *DBHealthChecker) HealthChecker { return hc }),
 	fx.Provide(NewOgenHandler),
 	fx.Provide(func(h *OgenHandler) (gen.Handler, error) { return h, nil }),
 	fx.Provide(func(h gen.Handler) (*gen.Server, error) {

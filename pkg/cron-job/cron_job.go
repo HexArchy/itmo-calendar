@@ -63,7 +63,7 @@ func (r *Runner) runOnce(ctx context.Context) {
 	defer func() {
 		if rec := recover(); rec != nil {
 			if r.logger != nil {
-				r.logger.Error("panic in cron job: %v", zap.Any("recover", rec))
+				r.logger.Error("panic in cron job", zap.Any("recover", rec))
 			}
 		}
 	}()
@@ -71,7 +71,7 @@ func (r *Runner) runOnce(ctx context.Context) {
 	locked, err := r.locker.Lock(ctx, r.jobName)
 	if err != nil {
 		if r.logger != nil {
-			r.logger.Error("failed to acquire lock: %v", zap.Error(err))
+			r.logger.Error("failed to acquire lock", zap.Error(err))
 		}
 		return
 	}
@@ -84,12 +84,12 @@ func (r *Runner) runOnce(ctx context.Context) {
 	defer func() {
 		unlockErr := r.locker.Unlock(ctx, r.jobName)
 		if unlockErr != nil && r.logger != nil {
-			r.logger.Error("failed to release lock: %v", zap.Error(unlockErr))
+			r.logger.Error("failed to release lock", zap.Error(unlockErr))
 		}
 	}()
 
 	err = r.job.Execute(ctx)
 	if err != nil && r.logger != nil {
-		r.logger.Error("failed to execute job: %v", zap.Error(err))
+		r.logger.Error("failed to execute job", zap.Error(err))
 	}
 }

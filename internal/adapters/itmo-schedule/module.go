@@ -8,6 +8,6 @@ import (
 
 var Module = fx.Module("adapter-itmo-schedule",
 	fx.Provide(func(cfg *config.ITMO) *Client {
-		return New(cfg.BaseURL)
+		return New(cfg.BaseURL, cfg.InsecureSkipVerify)
 	}),
 )

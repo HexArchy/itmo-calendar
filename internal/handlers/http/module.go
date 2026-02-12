@@ -11,5 +11,6 @@ var Module = fx.Module("http",
 		var cfg Config
 		return &cfg, loader.Unmarshal("http_server", &cfg)
 	}),
+	fx.Provide(NewCalHandler),
 	fx.Provide(NewServer),
 )

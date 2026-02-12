@@ -50,7 +50,7 @@ func (c *Client) transformDay(day scheduleDayDTO) (entities.DaySchedule, error) 
 
 	lessons := make([]entities.Lesson, 0, len(day.Lessons))
 	for _, lesson := range day.Lessons {
-		transformedLesson, errTransform := c.transformLesson(day.Date, lesson)
+		transformedLesson, errTransform := c.transformLesson(date, lesson)
 		if errTransform != nil {
 			return entities.DaySchedule{}, errors.Wrap(errTransform, "transform lesson")
 		}
@@ -65,15 +65,15 @@ func (c *Client) transformDay(day scheduleDayDTO) (entities.DaySchedule, error) 
 }
 
 // transformLesson converts a lesson DTO to domain entity.
-func (c *Client) transformLesson(dateStr string, lesson lessonDTO) (entities.Lesson, error) {
-	startTime, err := parseDateTime(dateStr, lesson.TimeStart)
+func (c *Client) transformLesson(date time.Time, lesson lessonDTO) (entities.Lesson, error) {
+	startTime, err := parseTimeOnDate(date, lesson.TimeStart)
 	if err != nil {
-		return entities.Lesson{}, errors.Wrapf(err, "parse start time %q %q", dateStr, lesson.TimeStart)
+		return entities.Lesson{}, errors.Wrapf(err, "parse start time %q", lesson.TimeStart)
 	}
 
-	endTime, err := parseDateTime(dateStr, lesson.TimeEnd)
+	endTime, err := parseTimeOnDate(date, lesson.TimeEnd)
 	if err != nil {
-		return entities.Lesson{}, errors.Wrapf(err, "parse end time %q %q", dateStr, lesson.TimeEnd)
+		return entities.Lesson{}, errors.Wrapf(err, "parse end time %q", lesson.TimeEnd)
 	}
 
 	// Handle potential null values.
@@ -100,11 +100,23 @@ func (c *Client) transformLesson(dateStr string, lesson lessonDTO) (entities.Les
 	}, nil
 }
 
-// parseDateTime combines date string (YYYY-MM-DD) and time string (HH:MM) into [time.Time] in Moscow time zone.
-func parseDateTime(dateStr, timeStr string) (time.Time, error) {
-	date, err := time.ParseInLocation("2006-01-02 15:04", dateStr+" "+timeStr, moscowLocation)
+// parseTimeOnDate combines date and time string (HH:MM) into [time.Time] in Moscow time zone.
+func parseTimeOnDate(date time.Time, timeStr string) (time.Time, error) {
+	t, err := time.ParseInLocation("15:04", timeStr, moscowLocation)
 	if err != nil {
-		return time.Time{}, errors.Wrapf(err, "parse date %q and time %q", dateStr, timeStr)
+		return time.Time{}, errors.Wrapf(err, "parse time %q", timeStr)
 	}
-	return date, nil
+
+	result := time.Date(
+		date.Year(),
+		date.Month(),
+		date.Day(),
+		t.Hour(),
+		t.Minute(),
+		0,
+		0,
+		moscowLocation,
+	)
+
+	return result, nil
 }

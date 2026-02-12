@@ -95,14 +95,15 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 		formReq.AddCookie(cookie)
 	}
 
-	c.httpClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
-		return http.ErrUseLastResponse
+	noRedirectClient := &http.Client{
+		Transport: c.httpClient.Transport,
+		Timeout:   c.httpClient.Timeout,
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
-	defer func() {
-		c.httpClient.CheckRedirect = nil
-	}()
 
-	formResp, err := c.httpClient.Do(formReq)
+	formResp, err := noRedirectClient.Do(formReq)
 	if err != nil {
 		return nil, errors.Wrap(err, "form submit")
 	}

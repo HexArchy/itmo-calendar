@@ -27,10 +27,10 @@ type Client struct {
 }
 
 // New creates new Client.
-func New(baseURL string) *Client {
+func New(baseURL string, insecureSkipVerify bool) *Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // G402: ITMO API uses self-signed certificates.
+			InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // G402: ITMO API may use self-signed certificates.
 		},
 	}
 

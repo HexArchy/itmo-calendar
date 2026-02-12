@@ -20,10 +20,10 @@ type Client struct {
 }
 
 // New creates a new ITMO OAuth tokens client.
-func New(clientID, redirectURI, providerURL string, logger *zap.Logger) *Client {
+func New(clientID, redirectURI, providerURL string, insecureSkipVerify bool, logger *zap.Logger) *Client {
 	tr := &http.Transport{
 		TLSClientConfig: &tls.Config{
-			InsecureSkipVerify: true, //nolint:gosec // G402: ITMO API uses self-signed certificates.
+			InsecureSkipVerify: insecureSkipVerify, //nolint:gosec // G402: ITMO API may use self-signed certificates.
 		},
 	}
 

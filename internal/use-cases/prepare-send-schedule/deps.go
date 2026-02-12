@@ -12,4 +12,5 @@ type Cron interface {
 
 type Users interface {
 	GetAll(ctx context.Context) ([]entities.User, error)
+	GetBatch(ctx context.Context, limit, offset int) ([]entities.User, error)
 }

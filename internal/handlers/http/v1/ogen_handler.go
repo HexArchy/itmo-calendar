@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/go-chi/chi/v5/middleware"
 	"go.uber.org/zap"
 
 	"github.com/hexarchy/itmo-calendar/internal/entities"
@@ -16,12 +17,18 @@ import (
 	subscribeschedule "github.com/hexarchy/itmo-calendar/internal/use-cases/subscribe-schedule"
 )
 
+// HealthChecker provides health check capability.
+type HealthChecker interface {
+	Ping(ctx context.Context) error
+}
+
 // OgenHandler implements gen.Handler using application use-cases.
 type OgenHandler struct {
-	getICal     *getical.UseCase
-	getSchedule *getschedule.UseCase
-	subscribe   *subscribeschedule.UseCase
-	logger      *zap.Logger
+	getICal       *getical.UseCase
+	getSchedule   *getschedule.UseCase
+	subscribe     *subscribeschedule.UseCase
+	healthChecker HealthChecker
+	logger        *zap.Logger
 }
 
 // NewOgenHandler creates a new OgenHandler.
@@ -29,19 +36,21 @@ func NewOgenHandler(
 	getICal *getical.UseCase,
 	getSchedule *getschedule.UseCase,
 	subscribe *subscribeschedule.UseCase,
+	healthChecker HealthChecker,
 	logger *zap.Logger,
 ) *OgenHandler {
 	return &OgenHandler{
-		getICal:     getICal,
-		getSchedule: getSchedule,
-		subscribe:   subscribe,
-		logger:      logger.With(zap.String("component", "ogen_handler")),
+		getICal:       getICal,
+		getSchedule:   getSchedule,
+		subscribe:     subscribe,
+		healthChecker: healthChecker,
+		logger:        logger.With(zap.String("component", "ogen_handler")),
 	}
 }
 
 // HealthCheck implements gen.Handler.
-func (h *OgenHandler) HealthCheck(_ context.Context) error {
-	return nil
+func (h *OgenHandler) HealthCheck(ctx context.Context) error {
+	return h.healthChecker.Ping(ctx)
 }
 
 // GetICal implements gen.Handler.
@@ -112,20 +121,43 @@ func (h *OgenHandler) SubscribeSchedule(
 }
 
 // NewError implements gen.Handler.
-func (h *OgenHandler) NewError(_ context.Context, err error) *gen.ErrorStatusCode {
+func (h *OgenHandler) NewError(ctx context.Context, err error) *gen.ErrorStatusCode {
 	code := http.StatusInternalServerError
 	title := "Internal Server Error"
+	message := "internal server error"
 
-	if errors.Is(err, entities.ErrNotFound) {
+	switch {
+	case errors.Is(err, entities.ErrNotFound):
 		code = http.StatusNotFound
 		title = "Not Found"
+		message = "not found"
+
+	case errors.Is(err, entities.ErrAuthFailed):
+		code = http.StatusUnauthorized
+		title = "Unauthorized"
+		message = "authentication failed"
+
+	case errors.Is(err, entities.ErrUpstreamFail):
+		code = http.StatusBadGateway
+		title = "Bad Gateway"
+		message = "upstream service unavailable"
+
+	default:
+		h.logger.Error("internal error",
+			zap.Error(err),
+			zap.String("request_id", requestIDFromContext(ctx)),
+		)
 	}
 
 	return &gen.ErrorStatusCode{
 		StatusCode: code,
 		Response: gen.Error{
 			Error:   gen.NewOptString(title),
-			Message: gen.NewOptString(err.Error()),
+			Message: gen.NewOptString(message),
 		},
 	}
+}
+
+func requestIDFromContext(ctx context.Context) string {
+	return middleware.GetReqID(ctx)
 }

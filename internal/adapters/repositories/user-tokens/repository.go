@@ -73,7 +73,7 @@ LIMIT 1`
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return &entities.UserTokens{}, nil
+			return nil, nil
 		}
 		return nil, errors.Wrap(err, "scan user tokens")
 	}

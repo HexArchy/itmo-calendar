@@ -4,10 +4,13 @@ import (
 	"context"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"strconv"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
 
@@ -26,35 +29,43 @@ type Server struct {
 }
 
 // NewServer creates a new HTTP server with ogen handler, Scalar docs and debug routes.
-func NewServer(ogenSrv *gen.Server, cfg *Config, logger *zap.Logger) *Server {
-	mux := http.NewServeMux()
-
-	// ogen API routes (already prefixed with /api/v1)
-	mux.Handle("/api/v1/", ogenSrv)
-
-	// OpenAPI spec and documentation
-	mux.Handle("/openapi.yaml", api.SpecHandler())
-	mux.Handle("/docs", api.ScalarDocsHandler())
-
-	// Debug/pprof routes
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-	mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-	mux.Handle("/debug/pprof/threadcreate", pprof.Handler("threadcreate"))
-	mux.Handle("/debug/pprof/block", pprof.Handler("block"))
-	mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
-	mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
-
+func NewServer(ogenSrv *gen.Server, calHandler *CalHandler, cfg *Config, logger *zap.Logger) *Server {
 	srvLogger := logger.With(zap.String("component", "http_server"))
+
+	r := chi.NewRouter()
+
+	// Global middleware stack
+	r.Use(middleware.RealIP)
+	r.Use(middleware.RequestID)
+	r.Use(NewLoggingMiddleware(srvLogger))
+	r.Use(middleware.Recoverer)
+	r.Use(cors.Handler(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-ID"},
+	}))
+
+	// Rate-limited routes
+	r.Group(func(r chi.Router) {
+		r.Use(httprate.LimitByIP(cfg.RateLimitRPM, time.Minute))
+		r.Mount("/api/v1", ogenSrv)
+		r.Handle("/cal", calHandler)
+	})
+
+	// Documentation (no rate limiting)
+	r.Handle("/openapi.yaml", api.SpecHandler())
+	r.Handle("/docs", api.ScalarDocsHandler())
+
+	// Debug/pprof routes (only if enabled)
+	if cfg.PprofEnabled {
+		r.Mount("/debug", middleware.Profiler())
+	}
 
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 
 	httpSrv := &http.Server{
 		Addr:         addr,
-		Handler:      NewLoggingMiddleware(srvLogger)(mux),
+		Handler:      r,
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 		IdleTimeout:  cfg.IdleTimeout,
