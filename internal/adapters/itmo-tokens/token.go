@@ -17,6 +17,7 @@ import (
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
+	nethtml "golang.org/x/net/html"
 )
 
 // Get performs OAuth2 Authorization Code Flow with PKCE and returns tokens.
@@ -72,6 +73,14 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 		return nil, errors.Wrap(err, "extract form data")
 	}
 
+	formActionURL, err := url.Parse(formAction)
+	if err != nil {
+		return nil, errors.Wrap(err, "parse form action")
+	}
+	if !formActionURL.IsAbs() {
+		formActionURL = resp.Request.URL.ResolveReference(formActionURL)
+	}
+
 	// Step 2: Submit the login form
 	form := url.Values{
 		"username":   {strconv.FormatInt(isu, 10)},
@@ -82,7 +91,12 @@ func (c *Client) Get(ctx context.Context, isu int64, password string) (*entities
 	// Add any session-specific parameters found in the form
 	maps.Copy(form, sessionParams)
 
-	formReq, err := http.NewRequestWithContext(ctx, http.MethodPost, formAction, strings.NewReader(form.Encode()))
+	formReq, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		formActionURL.String(),
+		strings.NewReader(form.Encode()),
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "build form request")
 	}
@@ -204,27 +218,106 @@ func (c *Client) exchangeCode(ctx context.Context, code, codeVerifier string) (*
 }
 
 // extractLoginFormData extracts both the form action URL and hidden form fields.
+//
+//nolint:gocognit,nestif // HTML parsing requires multiple steps.
 func (c *Client) extractLoginFormData(htmlContent string) (string, map[string][]string, error) {
-	formActionRe := regexp.MustCompile(`(?s)<form[^>]*\s+id="kc-form-login"[^>]*\s+action="([^"]+)"`)
-	matches := formActionRe.FindStringSubmatch(htmlContent)
-	if len(matches) < 2 { //nolint:mnd // regex submatch index.
+	doc, err := nethtml.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return "", nil, errors.Wrap(err, "parse html")
+	}
+
+	var bestForm *loginForm
+	var walk func(*nethtml.Node)
+	walk = func(n *nethtml.Node) {
+		if n.Type == nethtml.ElementNode && n.Data == "form" {
+			form := extractLoginForm(n)
+			if form != nil {
+				if form.hasUsername && form.hasPassword {
+					bestForm = form
+					return
+				}
+				if bestForm == nil {
+					bestForm = form
+				}
+			}
+		}
+
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
+			if bestForm != nil && bestForm.hasUsername && bestForm.hasPassword {
+				return
+			}
+		}
+	}
+
+	walk(doc)
+
+	if bestForm == nil || bestForm.action == "" {
 		c.logger.Debug("form", zap.String("html", htmlContent))
 		return "", nil, errors.New("form action not found")
 	}
 
-	formAction := html.UnescapeString(matches[1])
+	return bestForm.action, bestForm.hiddenFields, nil
+}
 
-	hiddenFieldsRe := regexp.MustCompile(`<input[^>]+type="hidden"[^>]+name="([^"]+)"[^>]+value="([^"]*)"[^>]*>`)
-	paramMatches := hiddenFieldsRe.FindAllStringSubmatch(htmlContent, -1)
+type loginForm struct {
+	action       string
+	hiddenFields map[string][]string
+	hasUsername  bool
+	hasPassword  bool
+}
 
-	params := make(map[string][]string)
-	for _, match := range paramMatches {
-		if len(match) >= 3 { //nolint:mnd // regex submatch index.
-			params[match[1]] = []string{html.UnescapeString(match[2])}
+// submitLoginForm submits the login form with the given credentials and session parameters.
+//
+//nolint:gocognit,nestif // Form submission requires multiple steps.
+func extractLoginForm(form *nethtml.Node) *loginForm {
+	action := getAttr(form, "action")
+	if action == "" {
+		return nil
+	}
+
+	data := &loginForm{
+		action:       html.UnescapeString(action),
+		hiddenFields: make(map[string][]string),
+	}
+
+	var walk func(*nethtml.Node)
+	walk = func(n *nethtml.Node) {
+		if n.Type == nethtml.ElementNode && n.Data == "input" {
+			name := getAttr(n, "name")
+			if name != "" {
+				inputType := strings.ToLower(getAttr(n, "type"))
+				if name == "username" {
+					data.hasUsername = true
+				}
+				if name == "password" {
+					data.hasPassword = true
+				}
+				if inputType == "hidden" {
+					value := html.UnescapeString(getAttr(n, "value"))
+					data.hiddenFields[name] = append(data.hiddenFields[name], value)
+				}
+			}
+		}
+
+		for child := n.FirstChild; child != nil; child = child.NextSibling {
+			walk(child)
 		}
 	}
 
-	return formAction, params, nil
+	walk(form)
+
+	return data
+}
+
+func getAttr(node *nethtml.Node, name string) string {
+	for _, attr := range node.Attr {
+		if attr.Key == name {
+			return attr.Val
+		}
+	}
+
+	return ""
 }
 
 // Refresh exchanges a refresh token for a new access token.
