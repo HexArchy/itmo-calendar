@@ -17,7 +17,7 @@ type TLS struct {
 
 func (t *TLS) BuildTLSConfig(serverName string) (*tls.Config, error) {
 	if t == nil || !t.Enabled {
-		return &tls.Config{}, nil //nolint:gosec // G402: empty config is intentional when TLS is disabled.
+		return nil, nil //nolint:nilnil // nil TLS config means "no TLS"; pgx needs nil to respect sslmode=disable.
 	}
 
 	cert, err := tls.LoadX509KeyPair(t.CertFile, t.KeyFile)
