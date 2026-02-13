@@ -9,6 +9,10 @@ import (
 	"github.com/hexarchy/itmo-calendar/internal/entities"
 )
 
+type TxRunner interface {
+	Run(ctx context.Context, fn func(ctx context.Context) error) error
+}
+
 type Schedules interface {
 	GetByCreds(ctx context.Context, isu int64, password string, from, to time.Time) ([]entities.DaySchedule, error)
 }

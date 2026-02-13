@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/hexarchy/itmo-calendar/internal/entities"
+	"github.com/hexarchy/itmo-calendar/pkg/transactions"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pkg/errors"
@@ -29,7 +30,8 @@ ON CONFLICT (isu) DO UPDATE SET updated_at = EXCLUDED.updated_at
 RETURNING isu, created_at, updated_at
 	`
 	var user entities.User
-	err := r.db.QueryRow(ctx, query, isu).Scan(&user.ISU, &user.CreatedAt, &user.UpdatedAt)
+	db := transactions.FromContext(ctx, r.db)
+	err := db.QueryRow(ctx, query, isu).Scan(&user.ISU, &user.CreatedAt, &user.UpdatedAt)
 	if err != nil {
 		return nil, errors.Wrap(err, "insert user")
 	}
@@ -42,7 +44,8 @@ func (r *Repository) GetAll(ctx context.Context) ([]entities.User, error) {
 SELECT isu, created_at, updated_at
 FROM users
 	`
-	rows, err := r.db.Query(ctx, query)
+	db := transactions.FromContext(ctx, r.db)
+	rows, err := db.Query(ctx, query)
 	if err != nil {
 		return nil, errors.Wrap(err, "select users")
 	}
@@ -74,7 +77,8 @@ FROM users
 ORDER BY isu
 LIMIT $1 OFFSET $2
 	`
-	rows, err := r.db.Query(ctx, query, limit, offset)
+	db := transactions.FromContext(ctx, r.db)
+	rows, err := db.Query(ctx, query, limit, offset)
 	if err != nil {
 		return nil, errors.Wrap(err, "select users batch")
 	}
@@ -115,7 +119,8 @@ SELECT isu, created_at, updated_at
 FROM users
 WHERE isu IN (` + strings.Join(placeholders, ",") + `)`
 
-	rows, err := r.db.Query(ctx, query, args...)
+	db := transactions.FromContext(ctx, r.db)
+	rows, err := db.Query(ctx, query, args...)
 	if err != nil {
 		return nil, errors.Wrap(err, "find users by ids")
 	}

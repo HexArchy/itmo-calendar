@@ -28,6 +28,7 @@ import (
 	"github.com/hexarchy/itmo-calendar/pkg/logger"
 	"github.com/hexarchy/itmo-calendar/pkg/postgres"
 	"github.com/hexarchy/itmo-calendar/pkg/rabbitmq"
+	"github.com/hexarchy/itmo-calendar/pkg/transactions"
 )
 
 // Module is the root fx module that assembles the entire application.
@@ -39,6 +40,7 @@ var Module = fx.Options(
 	logger.Module,
 	postgres.Module,
 	rabbitmq.Module,
+	transactions.Module,
 
 	// adapters
 	cronadapter.Module,

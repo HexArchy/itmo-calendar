@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/hexarchy/itmo-calendar/internal/entities"
+	"github.com/hexarchy/itmo-calendar/pkg/transactions"
 )
 
 const (
@@ -43,7 +44,8 @@ VALUES ($1, $2)
 ON CONFLICT (isu) DO UPDATE SET ical = EXCLUDED.ical
 `
 
-	_, err := r.db.Exec(ctx, query, caldav.ISU, []byte(caldav.ICal.Serialize()))
+	db := transactions.FromContext(ctx, r.db)
+	_, err := db.Exec(ctx, query, caldav.ISU, []byte(caldav.ICal.Serialize()))
 	if err != nil {
 		return errors.Wrap(err, "caldav repository: create")
 	}
@@ -61,7 +63,8 @@ func (r *Repository) Get(ctx context.Context, isu int64) (entities.CalDav, error
 	const query = `SELECT isu, ical FROM caldav WHERE isu = $1`
 	var caldav entities.CalDav
 	var ical []byte
-	err := r.db.QueryRow(ctx, query, isu).Scan(&caldav.ISU, &ical)
+	db := transactions.FromContext(ctx, r.db)
+	err := db.QueryRow(ctx, query, isu).Scan(&caldav.ISU, &ical)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return entities.CalDav{}, errors.Wrapf(entities.ErrNotFound, "caldav repository: get isu %d", isu)
