@@ -51,7 +51,7 @@ func NewServer(
 	r.Use(middleware.Recoverer)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins: []string{"*"},
-		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PROPFIND", "REPORT"},
+		AllowedMethods: []string{"GET", "POST", "OPTIONS", "PROPFIND", "PROPPATCH", "REPORT"},
 		AllowedHeaders: []string{"Content-Type", "Authorization", "X-Request-ID", "Depth"},
 	}))
 
@@ -144,6 +144,9 @@ func newCalDAVInterceptor(
 	handler *caldav.Handler,
 ) func(http.Handler) http.Handler {
 	caldavMux := auth.Wrap(handler)
+	// PROPPATCH is not supported by go-webdav's caldav.Handler (returns 501).
+	// Wrap with auth and handle as a no-op 207 for read-only compatibility.
+	propPatchMux := auth.Wrap(http.HandlerFunc(caldavhandler.HandlePropPatch))
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			switch {
@@ -156,6 +159,10 @@ func newCalDAVInterceptor(
 			case strings.HasPrefix(r.URL.Path, "/calendar/dav/"):
 				caldavMux.ServeHTTP(w, withRewrittenPath(r, "/caldav/"))
 			case strings.HasPrefix(r.URL.Path, "/caldav/"):
+				if r.Method == "PROPPATCH" {
+					propPatchMux.ServeHTTP(w, r)
+					return
+				}
 				caldavMux.ServeHTTP(w, r)
 			default:
 				next.ServeHTTP(w, r)
