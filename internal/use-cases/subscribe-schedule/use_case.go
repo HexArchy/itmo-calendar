@@ -14,6 +14,7 @@ const (
 )
 
 type UseCase struct {
+	tx        TxRunner
 	schedules Schedules
 	users     Users
 	iCal      ICal
@@ -21,8 +22,9 @@ type UseCase struct {
 	logger    *zap.Logger
 }
 
-func New(schedules Schedules, users Users, iCal ICal, caldav CalDav, logger *zap.Logger) *UseCase {
+func New(tx TxRunner, schedules Schedules, users Users, iCal ICal, caldav CalDav, logger *zap.Logger) *UseCase {
 	return &UseCase{
+		tx:        tx,
 		schedules: schedules,
 		users:     users,
 		iCal:      iCal,
@@ -32,28 +34,29 @@ func New(schedules Schedules, users Users, iCal ICal, caldav CalDav, logger *zap
 }
 
 func (u *UseCase) Execute(ctx context.Context, isu int64, password string) error {
-	from := time.Now().AddDate(0, 0, -_fromDays)
-	to := time.Now().AddDate(0, 0, _toDays)
+	return u.tx.Run(ctx, func(ctx context.Context) error {
+		user, err := u.users.Create(ctx, isu)
+		if err != nil {
+			return errors.Wrap(err, "create user")
+		}
 
-	schedule, err := u.schedules.GetByCreds(ctx, isu, password, from, to)
-	if err != nil {
-		return errors.Wrap(err, "get schedule")
-	}
+		from := time.Now().AddDate(0, 0, -_fromDays)
+		to := time.Now().AddDate(0, 0, _toDays)
 
-	user, err := u.users.Create(ctx, isu)
-	if err != nil {
-		return errors.Wrap(err, "create user")
-	}
+		schedule, err := u.schedules.GetByCreds(ctx, isu, password, from, to)
+		if err != nil {
+			return errors.Wrap(err, "get schedule")
+		}
 
-	ical, err := u.iCal.Generate(ctx, schedule)
-	if err != nil {
-		return errors.Wrap(err, "generate iCal")
-	}
+		ical, err := u.iCal.Generate(ctx, schedule)
+		if err != nil {
+			return errors.Wrap(err, "generate iCal")
+		}
 
-	err = u.caldav.Create(ctx, *user, ical)
-	if err != nil {
-		return errors.Wrap(err, "send schedule")
-	}
+		if err = u.caldav.Create(ctx, *user, ical); err != nil {
+			return errors.Wrap(err, "send schedule")
+		}
 
-	return nil
+		return nil
+	})
 }

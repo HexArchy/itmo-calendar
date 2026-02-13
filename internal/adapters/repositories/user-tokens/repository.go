@@ -16,6 +16,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/hexarchy/itmo-calendar/internal/entities"
+	"github.com/hexarchy/itmo-calendar/pkg/transactions"
 )
 
 // Repository provides access to user tokens storage.
@@ -61,7 +62,8 @@ LIMIT 1`
 
 	var encAccessToken, encRefreshToken string
 	tokens := &entities.UserTokens{}
-	row := r.db.QueryRow(ctx, query, isu)
+	db := transactions.FromContext(ctx, r.db)
+	row := db.QueryRow(ctx, query, isu)
 	err := row.Scan(
 		&tokens.ISU,
 		&encAccessToken,
@@ -130,7 +132,8 @@ ON CONFLICT (isu) DO UPDATE SET
 		tokens.CreatedAt = now
 	}
 
-	_, err = r.db.Exec(
+	db := transactions.FromContext(ctx, r.db)
+	_, err = db.Exec(
 		ctx,
 		query,
 		tokens.ISU,
